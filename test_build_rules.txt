@@ -1,0 +1,17 @@
+rom_header extracted/header.bin
+arm9_entry KEEP
+arm9_load KEEP
+arm7_entry KEEP
+arm7_load KEEP
+fnt extracted/fnt.bin
+file_mode ADJUST
+arm9 extracted/arm9.bin
+arm7 extracted/arm7.bin
+arm9ovt extracted/arm9ovt.bin
+arm7ovt extracted/arm7ovt.bin
+icon extracted/banner.bin
+rsa_sig extracted/rsasig.bin
+data extracted/root
+ovt_repl_flag 0xff
+ov9 extracted/overlay9
+ov7 extracted/overlay7
