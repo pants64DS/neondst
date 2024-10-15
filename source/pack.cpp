@@ -445,7 +445,7 @@ int pack(const fs::path& buildRulePath, const fs::path& ndsOutputPath)
 	std::cout << DINFO << "Reading build rules from " << buildRulePath << '\n';
 
 	std::unordered_map<std::string, RuleParams> rules;
-	rules["rom_header"]    = RuleParams{REMPTY, AFILE};
+	rules["header"]        = RuleParams{REMPTY, AFILE};
 	rules["arm9_entry"]    = RuleParams{RKEEP, AVALUE | AKEEP};
 	rules["arm9_load"]     = RuleParams{RKEEP, AVALUE | AKEEP};
 	rules["arm7_entry"]    = RuleParams{RKEEP, AVALUE | AKEEP};
@@ -505,7 +505,7 @@ int pack(const fs::path& buildRulePath, const fs::path& ndsOutputPath)
 	unsigned ovt9Offset, ovt7Offset, arm9Offset, arm7Offset, fntOffset, iconOffset, fatOffset;
 	unsigned romHeaderSize, fntSize, ovt7Size, ovt9Size, fatSize, arm7Size, arm9Size, romOffset, iconSize, rsaSize, dataSize;
 
-	fs::path romHeaderPath(rules["rom_header"].val);
+	fs::path romHeaderPath(rules["header"].val);
 	fs::path fntPath(rules["fnt"].val);
 	fs::path rootPath(rules["data"].val);
 	fs::path ovt7Path(rules["arm7ovt"].val);

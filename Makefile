@@ -1,4 +1,4 @@
-SOURCES  := source
+SOURCES  := source source/commands
 BUILD    := build
 OUTPUT   := neondst
 INCLUDES := $(SOURCES)
