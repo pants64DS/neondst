@@ -9,26 +9,29 @@ void Commands::help(std::string_view commandName)
 
 		for (const Command& command : commands)
 		{
-			if (command.subcommandSet == SubcommandSet::saveApply)
-			{
-				std::cout <<   "\tneondst " << command.name << " save " << command.usage;
-				std::cout << "\n\tneondst " << command.name << " apply " << command.usage << '\n';
-			}
-			else
-				std::cout << "\tneondst " << command.name << ' ' << command.usage << '\n';
-		};
-	}
-	else
-	{
-		for (const Command& command : commands)
-		{
-			if (command.name == commandName)
-			{
-				command.printUsage();
-				return;
-			}
+			std::cout << '\t';
+
+			command.printUsage();
 		}
 
+		return;
+	}
+
+	bool found = false;
+
+	for (const Command& command : commands)
+	{
+		if (command.name == commandName)
+		{
+			std::cout << (found ? "   or: " : "usage: ");
+			found = true;
+
+			command.printUsage();
+		}
+	}
+
+	if (!found)
+	{
 		std::cout << "error: '" << commandName << "' is not a neondst command\n";
 
 		Commands::help("help");

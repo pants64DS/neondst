@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 
-int Command::run(int argc, char** argv) const
+int Command::run(char** argv) const
 {
 	bool separatorFound = false;
 	const char* error = nullptr;
@@ -13,9 +13,9 @@ int Command::run(int argc, char** argv) const
 
 	// std::vector<std::string_view> options;
 
-	for (int i = 2; i < argc; ++i)
+	while (*argv)
 	{
-		std::string_view arg = argv[i];
+		std::string_view arg = *argv++;
 
 		if (!separatorFound && arg.starts_with("--"))
 		{
@@ -27,9 +27,7 @@ int Command::run(int argc, char** argv) const
 			}
 		}
 		else
-		{
 			args.push_back(arg);
-		}
 	}
 
 	if (args.size() < minArgs)
@@ -64,30 +62,48 @@ int Command::run(int argc, char** argv) const
 
 void Command::printUsage() const
 {
-	if (subcommandSet == SubcommandSet::saveApply)
-	{
-		std::cout <<   "usage: neondst " << name << " save " << usage;
-		std::cout << "\n   or: neondst " << name << " apply " << usage << '\n';
-	}
-	else
-		std::cout << "usage: neondst " << name << ' ' << usage << '\n';;
+	std::cout << "neondst " << name;
+
+	if (subName) std::cout << ' ' << subName;
+
+	std::cout << ' ' << usage << '\n';
 }
 
 void Command::printError(const char* error) const
 {
-	std::cout << "error: " << error << '\n';
+	std::cout << "error: " << error << "\nusage: ";
 
 	printUsage();
 }
 
-int runCommand(std::string_view commandName, int argc, char** argv)
+int runCommand(std::string_view commandName, char** argv)
 {
-	for (const Command& command : commands)
-		if (command.name == commandName)
-			return command.run(argc, argv);
+	const char* foundName = nullptr;
 
-	std::cout << "error: '" << commandName << "' is not a neondst command\n";
-	Commands::help();
+	for (const Command& command : commands)
+	{
+		if (command.name == commandName)
+		{
+			if (!command.subName)
+				return command.run(argv);
+
+			if (argv[0] && std::string_view{argv[0]} == command.subName)
+				return command.run(argv + 1);
+
+			foundName = command.name;
+		}
+	}
+
+	if (foundName)
+	{
+		std::cout << "error: invalid subcommand\n";
+		Commands::help(foundName);
+	}
+	else
+	{
+		std::cout << "error: '" << commandName << "' is not a neondst command\n";
+		Commands::help();
+	}
 
 	return 1;
 }

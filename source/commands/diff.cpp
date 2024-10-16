@@ -1,9 +1,12 @@
 #include "command.h"
 #include <iostream>
 
-void Commands::diff(SaveApplySubCommand subcommand)
+void Commands::diff_save()
 {
-	(void)subcommand;
+	std::cout << "diff save not implemented yet :(\n";
+}
 
-	std::cout << "diff not implemented yet :(\n";
+void Commands::diff_apply()
+{
+	std::cout << "diff apply not implemented yet :(\n";
 }
