@@ -6,23 +6,6 @@
 
 namespace fs = std::filesystem;
 
-
-#define FSTREAM_VALID(x) \
-			if(!x.good()){ \
-				std::cout << DERROR << "Input file invalid, reached EOF\n"; \
-				x.close(); \
-				return -1; \
-			}
-#define FSTREAM_OPEN_CHECK \
-			if (!outFile.is_open()) { \
-				std::cout << DERROR << "Failed to open file " << outputPath << '\n'; \
-				return -1; \
-			}
-#define FILE_EXISTS(x) \
-			if(fs::exists(x)){ \
-				std::cout << DWARNING << "File " << outputPath << " already exists\n"; \
-			}
-
 // Defined in pack.cpp
 NDSDirectory buildFntTree(unsigned char* fnt, unsigned dirID, unsigned fntSize);
 
@@ -34,21 +17,16 @@ void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir,
 	{
 		fs::path fp = p / dir.files[i];
 
-		if(!fs::exists(fp)){
-
-			V_PRINT("Extracting file " << fp)
-
+		if (!fs::exists(fp))
+		{
 			unsigned short fid = dir.firstFileID + i;
 			unsigned start = urom[(fatOffset + fid * 8) / 4];
 			unsigned size = urom[(fatOffset + fid * 8 + 4) / 4] - start;
 
 			std::ofstream outFile(fp, std::ios::binary | std::ios::out);
-		
+
 			if (!outFile.is_open())
-			{
-				std::cout << DERROR << "Failed to create file " << fp << '\n';
-				std::exit(-1);
-			}
+				throw std::runtime_error("error: failed to create file " + fp.native());
 
 			outFile.write(reinterpret_cast<const char*>(&rom[start]), size);
 			outFile.close();
@@ -61,24 +39,8 @@ void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir,
 	{
 		fs::path sp = p / dir.dirs[i].dirName;
 
-		if(!fs::exists(sp) || (fs::exists(sp) && !fs::is_directory(sp))){
-
-			V_PRINT("Creating data directory " << sp)
-
-			try
-			{
-				if (!fs::create_directory(sp))
-				{
-					std::cout << DERROR << "Failed to create directory " << sp << '\n';
-					std::exit(-1);
-				}
-			}
-			catch (std::exception& e)
-			{
-				std::cout << DERROR << e.what() << '\n';
-				std::exit(-1);
-			}
-		}
+		if (!fs::exists(sp) || !fs::is_directory(sp))
+			fs::create_directory(sp);
 		else
 			std::cout << DWARNING << "Directory " << sp << " already exists\n";
 
@@ -86,26 +48,26 @@ void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir,
 	}
 }
 
+void writeOutputFile(const fs::path& outputPath, const unsigned char* data, std::size_t size)
+{
+	std::ofstream outFile(outputPath, std::ios::binary | std::ios::out);
+
+	if (!outFile.is_open())
+		throw std::runtime_error("error: failed to open file " + outputPath.native());
+
+	outFile.write(reinterpret_cast<const char*>(data), size);
+}
+
 int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 {
-	// TODO: read these from a text file!
 	fs::path dataPath = fsOutputPath / "root";
 	fs::path ov7Path = fsOutputPath / "overlay7";
 	fs::path ov9Path = fsOutputPath / "overlay9";
 
 	unsigned ndsFileSize = fs::file_size(ndsInputPath);
 
-	if (!fs::exists(ndsInputPath) || !fs::is_regular_file(ndsInputPath))
-	{
-		std::cout << DERROR << "NDS input file " << ndsInputPath << " is not a valid file\n";
-		return -1;
-	}
-
 	if (ndsFileSize > oneGB)
-	{
-		std::cout << DERROR << "NDS input file " << ndsInputPath << " is larger than 1GB\n";
-		return -1;
-	}
+		throw std::length_error("error: the input file is larger than 1 GB");
 
 	if (fs::exists(fsOutputPath) && fs::is_directory(fsOutputPath))
 		std::cout << DWARNING << "Filesystem output path " << fsOutputPath << " already exists, extracting missing files\n";
@@ -115,13 +77,8 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	fs::path outputPath;
 	ndsFile.open(ndsInputPath, std::ios::in | std::ios::binary);
 
-	if (!ndsFile.is_open())
-	{
-		std::cout << DERROR << "Failed to open file " << ndsInputPath << '\n';
-		return -1;
-	}
-
-	FSTREAM_VALID(ndsFile)
+	if (!ndsFile.good())
+		throw std::runtime_error("error: failed to open file " + ndsInputPath.native());
 
 	std::vector<unsigned char> rom;
 	rom.resize(ndsFileSize);
@@ -153,19 +110,10 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 	std::cout << DINFO << "Creating directories\n";
 
-	try
-	{
-		fs::create_directories(fsOutputPath);
-		fs::create_directories(dataPath);
-		fs::create_directories(ov7Path);
-		fs::create_directories(ov9Path);
-	}
-	catch (std::exception& e)
-	{
-		std::cout << DERROR << e.what() << '\n';
-
-		return -1;
-	}
+	fs::create_directories(fsOutputPath);
+	fs::create_directories(dataPath);
+	fs::create_directories(ov7Path);
+	fs::create_directories(ov9Path);
 
 	outputPath = fsOutputPath / "header.bin";
 
@@ -173,13 +121,9 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting ROM header " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(rom.data()), 0x4000);
-		outFile.close();
+		writeOutputFile(outputPath, rom.data(), 0x4000);
 	}
-	else	
+	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
 
 	outputPath = fsOutputPath / "arm9.bin";
@@ -188,11 +132,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting ARM9 binary " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[arm9Offset]), arm9Size);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[arm9Offset], arm9Size);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -203,11 +143,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting ARM7 binary " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[arm7Offset]), arm7Size);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[arm7Offset], arm7Size);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -218,11 +154,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting ARM9 Overlay Table " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[ovt9Offset]), ovt9Size);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[ovt9Offset], ovt9Size);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -233,11 +165,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting ARM7 Overlay Table " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[ovt7Offset]), ovt7Size);
-		outFile.close();	
+		writeOutputFile(outputPath, &rom[ovt7Offset], ovt7Size);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -275,11 +203,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 			iconSize = 0;
 		}
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[iconOffset]), iconSize);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[iconOffset], iconSize);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -290,11 +214,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting File Name Table " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[fntOffset]), fntSize);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[fntOffset], fntSize);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -305,11 +225,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting File Allocation Table " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[fatOffset]), fatSize);
-		outFile.close();
+		writeOutputFile(outputPath, &rom[fatOffset], fatSize);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -320,11 +236,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << DINFO << "Extracting RSA signature " << outputPath << '\n';
 
-		outFile.open(outputPath, std::ios::binary | std::ios::out);
-		FSTREAM_OPEN_CHECK
-
-		outFile.write(reinterpret_cast<const char*>(&rom[rsaOffset]), rsaSize);
-		outFile.close();	
+		writeOutputFile(outputPath, &rom[rsaOffset], rsaSize);
 	}
 	else
 		std::cout << DWARNING << "File " << outputPath << " already exists\n";
@@ -343,15 +255,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 			outputPath += ".bin";
 
 			if (!fs::exists(outputPath))
-			{
-				V_PRINT("Extracting ARM9 Overlay " << outputPath)
-
-				outFile.open(outputPath, std::ios::binary | std::ios::out);
-				FSTREAM_OPEN_CHECK
-
-				outFile.write(reinterpret_cast<const char*>(&rom[ovStart]), ovSize);
-				outFile.close();
-			}
+				writeOutputFile(outputPath, &rom[ovStart], ovSize);
 			else
 				std::cout << DWARNING << "ARM9 Overlay " << outputPath << " already exists\n";
 		}
@@ -372,15 +276,7 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 			outputPath += ".bin";
 
 			if (!fs::exists(outputPath))
-			{
-				V_PRINT("Extracting ARM7 Overlay " << outputPath)
-
-				outFile.open(outputPath, std::ios::binary | std::ios::out);
-				FSTREAM_OPEN_CHECK
-
-				outFile.write(reinterpret_cast<const char*>(&rom[ovStart]), ovSize);
-				outFile.close();
-			}
+				writeOutputFile(outputPath, &rom[ovStart], ovSize);
 			else
 				std::cout << DWARNING << "ARM7 Overlay " << outputPath << " already exists\n";
 		}

@@ -7,11 +7,6 @@
 #include <utility>
 #include <cstdint>
 
-struct CommandError : std::logic_error
-{
-	using std::logic_error::logic_error;
-};
-
 namespace fs = std::filesystem;
 
 template<class T>
@@ -63,7 +58,7 @@ struct Command
 
 namespace Commands
 {
-	void init(const fs::path& cleanRomPath, const fs::path& modifiedRomPath, const fs::path& bakDirPath);
+	void init(const fs::path& cleanRomPath);
 	void build();
 	void start();
 	void diff_save();
@@ -75,7 +70,7 @@ namespace Commands
 }
 
 inline const Command commands[] = {
-	{Commands::init,       "init",    nullptr, "<clean ROM> [<modified ROM>] [<bak directory>]", 1},
+	{Commands::init,       "init",    nullptr, "<clean ROM>", 1},
 	{Commands::build,      "build",   nullptr, ""},
 	{Commands::start,      "start",   nullptr, ""},
 	{Commands::diff_save,  "diff",    "save",  ""},

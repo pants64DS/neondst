@@ -31,10 +31,10 @@ int Command::run(char** argv) const
 	}
 
 	if (args.size() < minArgs)
-		error = "not enough positional arguments";
+		error = "error: not enough positional arguments";
 
 	if (args.size() > maxArgs)
-		error = "too many positional arguments";
+		error = "error: too many positional arguments";
 
 	if (error)
 	{
@@ -50,7 +50,7 @@ int Command::run(char** argv) const
 	{
 		funcWrapper(funcAddr, args.data());
 	}
-	catch (const CommandError& ex)
+	catch (const std::exception& ex)
 	{
 		printError(ex.what());
 
@@ -71,7 +71,7 @@ void Command::printUsage() const
 
 void Command::printError(const char* error) const
 {
-	std::cout << "error: " << error << "\nusage: ";
+	std::cout << error << "\nusage: ";
 
 	printUsage();
 }

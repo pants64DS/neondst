@@ -1,13 +1,13 @@
 #include "command.h"
 #include <iostream>
 
-void Commands::init(const fs::path& cleanRomPath,
-          const fs::path& modifiedRomPath,
-          const fs::path& bakDirPath)
-{
-	(void)cleanRomPath;
-	(void)modifiedRomPath;
-	(void)bakDirPath;
+int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath);
 
-	std::cout << "init not implemented yet :(\n";
+void Commands::init(const fs::path& cleanRomPath)
+{
+	const fs::path clean = "clean";
+
+	extract(cleanRomPath, clean / "raw");
+
+	fs::create_directory(clean / "decompressed");
 }

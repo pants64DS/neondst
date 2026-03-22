@@ -1,4 +1,5 @@
 build
-extracted
+clean
+neondst
 *.exe
 *.nds
