@@ -58,7 +58,7 @@ void writeOutputFile(const fs::path& outputPath, const unsigned char* data, std:
 	outFile.write(reinterpret_cast<const char*>(data), size);
 }
 
-int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
+void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 {
 	fs::path dataPath = fsOutputPath / "root";
 	fs::path ov7Path = fsOutputPath / "overlay7";
@@ -288,6 +288,4 @@ int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	dumpFntTree(rom, rootDir, dataPath, fatOffset);
 
 	std::cout << DINFO << "Done\n";
-
-	return 0;
 }

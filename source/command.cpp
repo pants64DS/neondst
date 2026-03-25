@@ -3,52 +3,23 @@
 #include <iostream>
 #include <vector>
 
-int Command::run(char** argv) const
+int Command::run(int argc, char** argv) const
 {
-	bool separatorFound = false;
-	const char* error = nullptr;
-
-	std::vector<std::string_view> args;
-	args.reserve(maxArgs);
-
-	// std::vector<std::string_view> options;
-
-	while (*argv)
+	if (argc < minArgs)
 	{
-		std::string_view arg = *argv++;
-
-		if (!separatorFound && arg.starts_with("--"))
-		{
-			if (arg.size() == 2)
-				separatorFound = true;
-			else
-			{
-				// Handle options
-			}
-		}
-		else
-			args.push_back(arg);
-	}
-
-	if (args.size() < minArgs)
-		error = "error: not enough positional arguments";
-
-	if (args.size() > maxArgs)
-		error = "error: too many positional arguments";
-
-	if (error)
-	{
-		printError(error);
-
+		printError("error: not enough positional arguments");
 		return 1;
 	}
 
-	if (args.size() < maxArgs)
-		args.resize(maxArgs);
+	if (argc > maxArgs)
+	{
+		printError("error: too many positional arguments");
+		return 1;
+	}
 
 	try
 	{
-		funcWrapper(funcAddr, args.data());
+		funcWrapper(funcAddr, argc, argv);
 	}
 	catch (const std::exception& ex)
 	{
@@ -76,7 +47,7 @@ void Command::printError(const char* error) const
 	printUsage();
 }
 
-int runCommand(std::string_view commandName, char** argv)
+int runCommand(std::string_view commandName, int argc, char** argv)
 {
 	const char* foundName = nullptr;
 
@@ -85,10 +56,10 @@ int runCommand(std::string_view commandName, char** argv)
 		if (command.name == commandName)
 		{
 			if (!command.subName)
-				return command.run(argv);
+				return command.run(argc, argv);
 
 			if (argv[0] && std::string_view{argv[0]} == command.subName)
-				return command.run(argv + 1);
+				return command.run(argc - 1, argv + 1);
 
 			foundName = command.name;
 		}

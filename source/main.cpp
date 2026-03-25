@@ -14,5 +14,5 @@ int main(int argc, char** argv)
 	if (commandName == "--help" || commandName == "--version")
 		commandName.remove_prefix(2);
 
-	return runCommand(commandName, argv + 2);
+	return runCommand(commandName, argc - 2, argv + 2);
 }

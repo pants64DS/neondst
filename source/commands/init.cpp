@@ -1,7 +1,6 @@
 #include "command.h"
-#include <iostream>
 
-int extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath);
+void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath);
 
 void Commands::init(const fs::path& cleanRomPath)
 {
