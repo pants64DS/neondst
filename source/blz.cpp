@@ -172,7 +172,7 @@ namespace BLZ
 		const size_t reduction = CompressBackward(data.data(), dataSize, dest.data());
 
 		if (reduction == (size_t)-1)
-			throw std::runtime_error("error: compression failed");
+			throw std::runtime_error("compression failed");
 
 		const size_t destSize = dest.size() - reduction;
 		std::memmove(dest.data(), dest.data() + reduction, destSize);

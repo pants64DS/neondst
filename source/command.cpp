@@ -1,4 +1,5 @@
 #include "command.h"
+#include "common.h"
 
 #include <iostream>
 #include <vector>
@@ -7,13 +8,13 @@ int Command::run(int argc, char** argv) const
 {
 	if (argc < minArgs)
 	{
-		printError("error: not enough positional arguments");
+		printError("not enough positional arguments");
 		return 1;
 	}
 
 	if (argc > maxArgs)
 	{
-		printError("error: too many positional arguments");
+		printError("too many positional arguments");
 		return 1;
 	}
 
@@ -23,7 +24,7 @@ int Command::run(int argc, char** argv) const
 	}
 	catch (const std::exception& ex)
 	{
-		std::cout << ex.what() << '\n';
+		std::cout << ERROR << ex.what() << '\n';
 
 		return 1;
 	}
@@ -42,7 +43,7 @@ void Command::printUsage() const
 
 void Command::printError(const char* error) const
 {
-	std::cout << error << "\nusage: ";
+	std::cout << ERROR << error << "\nusage: ";
 
 	printUsage();
 }
@@ -67,12 +68,12 @@ int runCommand(std::string_view commandName, int argc, char** argv)
 
 	if (foundName)
 	{
-		std::cout << "error: invalid subcommand\n";
+		std::cout << ERROR "invalid subcommand\n";
 		Commands::help(foundName);
 	}
 	else
 	{
-		std::cout << "error: '" << commandName << "' is not a neondst command\n";
+		std::cout << ERROR "'" << commandName << "' is not a neondst command\n";
 		Commands::help();
 	}
 

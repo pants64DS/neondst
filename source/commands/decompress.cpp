@@ -24,17 +24,17 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 
 		if (!isArm9Bin && fs::equivalent(parentPath, rawPath))
 		{
-			std::cout << DWARNING << inputPath << " should not be compressed (skipped)\n";
+			std::cout << WARNING << inputPath << " should not be compressed (skipped)\n";
 			continue;
 		}
 
-		std::cout << DINFO << "Decompressing " << inputPath;
+		std::cout << "Decompressing " << inputPath;
 		std::cout << " -> " << outputPath << '\n';
 
 		std::ifstream inputFile(inputPath, std::ios::in | std::ios::binary);
 
 		if (!inputFile.is_open())
-			throw std::runtime_error("error: failed to open file " + inputPath.native());
+			throw std::runtime_error("failed to open file " + inputPath.native());
 
 		auto compressedSize = fs::file_size(inputPath);
 		std::vector<u8> buffer;
@@ -42,17 +42,17 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 		buffer.resize(compressedSize);
 
 		if (!inputFile.read(reinterpret_cast<char*>(buffer.data()), compressedSize))
-			throw std::runtime_error("error: failed to read file " + inputPath.native());
+			throw std::runtime_error("failed to read file " + inputPath.native());
 
 		if (isArm9Bin)
 		{
 			if (compressedSize < 0xaf0)
-				throw std::runtime_error("error: invalid arm9.bin");
+				throw std::runtime_error("invalid arm9.bin");
 
 			const u32 compressedPartEnd = readU32(buffer.data() + 0xaec);
 
 			if (compressedSize != compressedPartEnd - 0x02004000)
-				throw std::runtime_error("error: invalid arm9.bin");
+				throw std::runtime_error("invalid arm9.bin");
 
 			BLZ::uncompressInplace(buffer);
 			std::memset(buffer.data() + 0xaec, 0, 4);
@@ -60,17 +60,17 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 		else if (fs::equivalent(parentPath, rawPath / "overlay9"))
 			BLZ::uncompressInplace(buffer);
 		else
-			throw std::runtime_error("error: decompression of regular files not implemented yet");
+			throw std::runtime_error("decompression of regular files not implemented yet");
 
 		fs::create_directories(outputPath.parent_path());
 		std::ofstream outputFile(outputPath, std::ios::binary | std::ios::out);
 
 		if (!outputFile.is_open())
-			throw std::runtime_error("error: failed to create file " + outputPath.native());
+			throw std::runtime_error("failed to create file " + outputPath.native());
 
 		if (!outputFile.write(reinterpret_cast<const char*>(buffer.data()), buffer.size()))
-			throw std::runtime_error("error: failed to write file " + outputPath.native());
+			throw std::runtime_error("failed to write file " + outputPath.native());
 	}
 
-	std::cout << DINFO << "Done\n";
+	std::cout << "Done\n";
 }

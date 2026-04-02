@@ -1,12 +1,11 @@
-#ifndef COMMON_H
-#define COMMON_H
+#pragma once
 
 #include <vector>
 #include <string>
 #include <cstdint>
 
-#define DINFO		("[I]  ")
-#define DWARNING	("[W]  ")
+#define WARNING "\x1B[1;95mwarning: \033[0m"
+#define ERROR   "\x1B[1;91merror: \033[0m"
 
 using s8 = std::int8_t;
 using s16 = std::int16_t;
@@ -30,5 +29,3 @@ inline u32 readU32(const u8* p)
 {
 	return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
 }
-
-#endif  // COMMON_H
