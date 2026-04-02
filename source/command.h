@@ -89,7 +89,7 @@ namespace Commands
 {
 	void init(const fs::path& cleanRomPath);
 	void decompress(std::span<const fs::path> relativePaths);
-	void build();
+	void build(const fs::path& outputPath);
 	void start();
 	void diff_save();
 	void diff_apply();
@@ -102,7 +102,7 @@ namespace Commands
 inline const Command commands[] = {
 	{Commands::init,       "init",       nullptr, "<clean ROM>", 1},
 	{Commands::decompress, "decompress", nullptr, "<files...>", 1},
-	{Commands::build,      "build",      nullptr, ""},
+	{Commands::build,      "build",      nullptr, "[<output ROM>]"},
 	{Commands::start,      "start",      nullptr, ""},
 	{Commands::diff_save,  "diff",       "save",  ""},
 	{Commands::diff_apply, "diff",       "apply", ""},

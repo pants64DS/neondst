@@ -7,17 +7,6 @@
 
 #define DINFO		("[I]  ")
 #define DWARNING	("[W]  ")
-#define DERROR		("[E]  ")
-#define DINDENT		("     ")
-
-//#define PRINT_VERBOSE
-
-#ifdef PRINT_VERBOSE
-#define V_PRINT(x) \
-			std::cout << DINFO << x << std::endl;
-#else
-#define V_PRINT(x)
-#endif
 
 using s8 = std::int8_t;
 using s16 = std::int16_t;
@@ -28,8 +17,8 @@ using u32 = std::uint32_t;
 
 struct NDSDirectory
 {
-	unsigned short firstFileID;
-	unsigned short directoryID;
+	u16 firstFileID;
+	u16 directoryID;
 	std::string dirName;
 	std::vector<std::string> files;
 	std::vector<NDSDirectory> dirs;

@@ -2,6 +2,7 @@
 #include "common.h"
 
 #include <stdexcept>
+#include <cstring>
 
 static const char* SRC_SHORTAGE = "Source shortage.";
 static const char* DEST_OVERRUN = "Destination overrun.";
@@ -90,7 +91,7 @@ static size_t CompressBackward(const void *src, size_t size, void *dst)
 					  return -1;
 					v13 -= v4;
 					v5 -= 2;
-					u16 v3 = v5 & 0xFFF | (((u16)v4 - 3) << 12);
+					u16 v3 = (v5 & 0xFFF) | (((u16)v4 - 3) << 12);
 					--v12;
 					dst_[v12--] = v3 >> 8;
 					dst_[v12] = v3;
@@ -149,7 +150,7 @@ static void UncompressBackward(void* bottom)
 				if (pOut - length < pInTop)
 					throw std::runtime_error(DEST_OVERRUN);
 
-				for (int j = 0; j < length; ++j)
+				for (unsigned j = 0; j < length; ++j)
 					*--pOut = *--pTmp;
 			}
 
@@ -165,14 +166,30 @@ namespace BLZ
 {
 	std::vector<u8> compress(const std::vector<u8>& data)
 	{
-		size_t dataSize = data.size();
+		const size_t dataSize = data.size();
 		std::vector<u8> dest(dataSize);
 
-		size_t destSize = CompressBackward(data.data(), dataSize, dest.data());
-		if (destSize == -1)
-			throw std::runtime_error("Compression failed.");
+		const size_t reduction = CompressBackward(data.data(), dataSize, dest.data());
 
-		dest.resize(destSize);
+		if (reduction == (size_t)-1)
+			throw std::runtime_error("error: compression failed");
+
+		const size_t destSize = dest.size() - reduction;
+		std::memmove(dest.data(), dest.data() + reduction, destSize);
+		dest.resize(destSize + 8);
+
+		const size_t offset1 = reduction - 8;
+		const size_t offset2 = dest.size();
+
+		dest[destSize]     =  offset2        & 0xff;
+		dest[destSize + 1] = (offset2 >>  8) & 0xff;
+		dest[destSize + 2] = (offset2 >> 16) & 0xff;
+		dest[destSize + 3] = 8;
+		dest[destSize + 4] =  offset1        & 0xff;
+		dest[destSize + 5] = (offset1 >>  8) & 0xff;
+		dest[destSize + 6] = (offset1 >> 16) & 0xff;
+		dest[destSize + 7] = (offset1 >> 24) & 0xff;
+
 		return dest;
 	}
 

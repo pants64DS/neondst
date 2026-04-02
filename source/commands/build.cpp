@@ -1,7 +1,9 @@
 #include "command.h"
 #include <iostream>
 
-void Commands::build()
+int pack(const fs::path& outputPath);
+
+void Commands::build(const fs::path& outputPath)
 {
-	std::cout << "build not implemented yet :(\n";
+	pack(outputPath);
 }

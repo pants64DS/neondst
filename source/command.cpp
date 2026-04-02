@@ -23,7 +23,7 @@ int Command::run(int argc, char** argv) const
 	}
 	catch (const std::exception& ex)
 	{
-		printError(ex.what());
+		std::cout << ex.what() << '\n';
 
 		return 1;
 	}

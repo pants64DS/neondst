@@ -1,5 +1,7 @@
 build
 clean
+modified
+ignore
 neondst
 *.exe
 *.nds
