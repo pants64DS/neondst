@@ -7,21 +7,21 @@
 namespace fs = std::filesystem;
 
 // Defined in pack.cpp
-NDSDirectory buildFntTree(unsigned char* fnt, unsigned dirID, unsigned fntSize);
+NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize);
 
-void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir, const fs::path& p, unsigned fatOffset)
+void dumpFntTree(const std::vector<u8>& rom, const NDSDirectory& dir, const fs::path& p, u32 fatOffset)
 {
-	const unsigned* urom = reinterpret_cast<const unsigned*>(rom.data());
+	const u32* urom = reinterpret_cast<const u32*>(rom.data());
 
-	for (unsigned i = 0; i < dir.files.size(); i++)
+	for (u32 i = 0; i < dir.files.size(); i++)
 	{
 		fs::path fp = p / dir.files[i];
 
 		if (!fs::exists(fp))
 		{
-			unsigned short fid = dir.firstFileID + i;
-			unsigned start = urom[(fatOffset + fid * 8) / 4];
-			unsigned size = urom[(fatOffset + fid * 8 + 4) / 4] - start;
+			u16 fid = dir.firstFileID + i;
+			u32 start = urom[(fatOffset + fid * 8) / 4];
+			u32 size = urom[(fatOffset + fid * 8 + 4) / 4] - start;
 
 			std::ofstream outFile(fp, std::ios::binary | std::ios::out);
 
@@ -35,7 +35,7 @@ void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir,
 			std::cout << DWARNING << "File " << fp << " already exists\n";
 	}
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 	{
 		fs::path sp = p / dir.dirs[i].dirName;
 
@@ -48,7 +48,7 @@ void dumpFntTree(const std::vector<unsigned char>& rom, const NDSDirectory& dir,
 	}
 }
 
-void writeOutputFile(const fs::path& outputPath, const unsigned char* data, std::size_t size)
+void writeOutputFile(const fs::path& outputPath, const u8* data, std::size_t size)
 {
 	std::ofstream outFile(outputPath, std::ios::binary | std::ios::out);
 
@@ -64,7 +64,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	fs::path ov7Path = fsOutputPath / "overlay7";
 	fs::path ov9Path = fsOutputPath / "overlay9";
 
-	unsigned ndsFileSize = fs::file_size(ndsInputPath);
+	u32 ndsFileSize = fs::file_size(ndsInputPath);
 
 	if (ndsFileSize > oneGB)
 		throw std::length_error("error: the input file is larger than 1 GB");
@@ -80,7 +80,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	if (!ndsFile.good())
 		throw std::runtime_error("error: failed to open file " + ndsInputPath.native());
 
-	std::vector<unsigned char> rom;
+	std::vector<u8> rom;
 	rom.resize(ndsFileSize);
 
 	std::cout << DINFO << "Reading NDS file " << ndsInputPath << '\n';
@@ -88,25 +88,25 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	ndsFile.read(reinterpret_cast<char*>(rom.data()), ndsFileSize);
 	ndsFile.close();
 
-	unsigned* urom = reinterpret_cast<unsigned*>(rom.data());
-	unsigned short* srom = reinterpret_cast<unsigned short*>(rom.data());
+	u32* urom = reinterpret_cast<u32*>(rom.data());
+	u16* srom = reinterpret_cast<u16*>(rom.data());
 
-	unsigned arm9Offset = urom[8];
-	unsigned arm9Size = urom[11];
-	unsigned arm7Offset = urom[12];
-	unsigned arm7Size = urom[15];
-	unsigned ovt9Offset = urom[20];
-	unsigned ovt9Size = urom[21];
-	unsigned ovt7Offset = urom[22];
-	unsigned ovt7Size = urom[23];
-	unsigned fntOffset = urom[16];
-	unsigned fntSize = urom[17];
-	unsigned fatOffset = urom[18];
-	unsigned fatSize = urom[19];
-	unsigned iconOffset = urom[26];
-	unsigned rsaOffset = urom[32];
-	unsigned iconSize = 0x840;
-	unsigned rsaSize = 136;
+	u32 arm9Offset = urom[8];
+	u32 arm9Size = urom[11];
+	u32 arm7Offset = urom[12];
+	u32 arm7Size = urom[15];
+	u32 ovt9Offset = urom[20];
+	u32 ovt9Size = urom[21];
+	u32 ovt7Offset = urom[22];
+	u32 ovt7Size = urom[23];
+	u32 fntOffset = urom[16];
+	u32 fntSize = urom[17];
+	u32 fatOffset = urom[18];
+	u32 fatSize = urom[19];
+	u32 iconOffset = urom[26];
+	u32 rsaOffset = urom[32];
+	u32 iconSize = 0x840;
+	u32 rsaSize = 136;
 
 	std::cout << DINFO << "Creating directories\n";
 
@@ -178,7 +178,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 		if (iconOffset)
 		{
-			switch (*reinterpret_cast<unsigned short*>(&rom[iconOffset]))
+			switch (*reinterpret_cast<u16*>(&rom[iconOffset]))
 			{
 			default:
 				std::cout << DWARNING << "Invalid Icon / Title ID, defaulting to 0x840\n";
@@ -245,11 +245,11 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 	if (ovt9Size)
 	{
-		for (unsigned i = 0; i < ovt9Size / 32; i++)
+		for (u32 i = 0; i < ovt9Size / 32; i++)
 		{
-			unsigned short fid = srom[(ovt9Offset + i * 32 + 24) / 2];
-			unsigned ovStart = urom[(fatOffset + fid * 8) / 4];
-			unsigned ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
+			u16 fid = srom[(ovt9Offset + i * 32 + 24) / 2];
+			u32 ovStart = urom[(fatOffset + fid * 8) / 4];
+			u32 ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
 			
 			outputPath = ov9Path / std::to_string(urom[(ovt9Offset + i * 32) / 4]);
 			outputPath += ".bin";
@@ -265,11 +265,11 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 	if (ovt7Size)
 	{
-		for (unsigned i = 0; i < ovt7Size / 32; i++)
+		for (u32 i = 0; i < ovt7Size / 32; i++)
 		{
-			unsigned short fid = srom[(ovt7Offset + i * 32 + 24) / 2];
-			unsigned ovStart = urom[(fatOffset + fid * 8) / 4];
-			unsigned ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
+			u16 fid = srom[(ovt7Offset + i * 32 + 24) / 2];
+			u32 ovStart = urom[(fatOffset + fid * 8) / 4];
+			u32 ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
 
 			outputPath = ov7Path / "overlay7_";
 			outputPath += std::to_string(urom[(ovt7Offset + i * 32) / 4]);

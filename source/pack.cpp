@@ -27,12 +27,12 @@ static void checkFileSize(const fs::path& path, std::size_t size, std::size_t ma
 
 struct OverlayEntry
 {
-	unsigned start;
-	unsigned end;
-	unsigned short fileID;
+	u32 start;
+	u32 end;
+	u16 fileID;
 };
 
-static void romCheckBounds(std::vector<unsigned char>& rom, unsigned requiredSize)
+static void romCheckBounds(std::vector<u8>& rom, u32 requiredSize)
 {
 	if (oneGB < requiredSize)
 		throw std::length_error("error: ROM trying to grow larger than 1 GB");
@@ -41,16 +41,16 @@ static void romCheckBounds(std::vector<unsigned char>& rom, unsigned requiredSiz
 		rom.resize(requiredSize, 0xff);
 }
 
-NDSDirectory buildFntTree(unsigned char* fnt, unsigned dirID, unsigned fntSize)
+NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize)
 {
 	NDSDirectory dir;
-	unsigned dirOffset = (dirID & 0xFFF) * 8;
-	unsigned subOffset = *reinterpret_cast<unsigned*>(&fnt[dirOffset]);
-	dir.firstFileID = *reinterpret_cast<unsigned short*>(&fnt[dirOffset + 4]);
+	u32 dirOffset = (dirID & 0xFFF) * 8;
+	u32 subOffset = *reinterpret_cast<u32*>(&fnt[dirOffset]);
+	dir.firstFileID = *reinterpret_cast<u16*>(&fnt[dirOffset + 4]);
 	dir.directoryID = dirID;
 
-	unsigned relOffset = 0;
-	unsigned char len = 0;
+	u32 relOffset = 0;
+	u8 len = 0;
 	std::string name;
 
 	while (subOffset + relOffset < fntSize)
@@ -74,7 +74,7 @@ NDSDirectory buildFntTree(unsigned char* fnt, unsigned dirID, unsigned fntSize)
 
 		if (isSubdir)
 		{
-			NDSDirectory subDir = buildFntTree(fnt, *reinterpret_cast<unsigned short*>(&fnt[subOffset + relOffset]), fntSize);
+			NDSDirectory subDir = buildFntTree(fnt, *reinterpret_cast<u16*>(&fnt[subOffset + relOffset]), fntSize);
 			subDir.dirName = name;
 			dir.dirs.push_back(subDir);
 			relOffset += 2;
@@ -86,29 +86,29 @@ NDSDirectory buildFntTree(unsigned char* fnt, unsigned dirID, unsigned fntSize)
 	return dir;
 }
 
-static unsigned short fntFindNextFreeFileID(const NDSDirectory& dir)
+static u16 fntFindNextFreeFileID(const NDSDirectory& dir)
 {
-	unsigned short fileFree = dir.firstFileID + dir.files.size();
+	u16 fileFree = dir.firstFileID + dir.files.size();
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 		fileFree = std::max(fileFree, fntFindNextFreeFileID(dir.dirs[i]));
 
 	return fileFree;
 }
 
-static unsigned short fntFindNextFreeDirID(const NDSDirectory& dir)
+static u16 fntFindNextFreeDirID(const NDSDirectory& dir)
 {
-	unsigned short dirFree = dir.directoryID + 1;
+	u16 dirFree = dir.directoryID + 1;
 	
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 		dirFree = std::max(dirFree, fntFindNextFreeDirID(dir.dirs[i]));
 
 	return dirFree;
 }
 
-static unsigned fntDirectoryIndex(NDSDirectory& parent, const std::string& dataDir)
+static u32 fntDirectoryIndex(NDSDirectory& parent, const std::string& dataDir)
 {
-	for (unsigned i = 0; i < parent.dirs.size(); i++)
+	for (u32 i = 0; i < parent.dirs.size(); i++)
 		if (dataDir == parent.dirs[i].dirName)
 			return i;
 
@@ -118,8 +118,8 @@ static unsigned fntDirectoryIndex(NDSDirectory& parent, const std::string& dataD
 static bool fntAddNewFiles(
 	NDSDirectory& ndsDir,
 	const fs::path& dataDir,
-	unsigned short& freeFileID,
-	unsigned short& freeDirID,
+	u16& freeFileID,
+	u16& freeDirID,
 	bool newDir
 )
 {
@@ -137,7 +137,7 @@ static bool fntAddNewFiles(
 			);
 		}
 
-		unsigned i = fntDirectoryIndex(ndsDir, p.filename().string());
+		u32 i = fntDirectoryIndex(ndsDir, p.filename().string());
 
 		if (i != ~0u) // if the directory already exists in the fnt
 		{
@@ -171,24 +171,24 @@ static bool fntAddNewFiles(
 	return modified;
 }
 
-static unsigned fntDirectoryCount(const NDSDirectory& dir)
+static u32 fntDirectoryCount(const NDSDirectory& dir)
 {
-	unsigned count = dir.dirs.size();
+	u32 count = dir.dirs.size();
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 		count += fntDirectoryCount(dir.dirs[i]);
 
 	return count;
 }
 
-static unsigned fntByteCountFn(const NDSDirectory& dir)
+static u32 fntByteCountFn(const NDSDirectory& dir)
 {
-	unsigned bytes = 0;
+	u32 bytes = 0;
 
-	for (unsigned i = 0; i < dir.files.size(); i++)
+	for (u32 i = 0; i < dir.files.size(); i++)
 		bytes += dir.files[i].length() + 1;
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 	{
 		bytes += dir.dirs[i].dirName.length() + 3;
 		bytes += fntByteCountFn(dir.dirs[i]);
@@ -199,20 +199,20 @@ static unsigned fntByteCountFn(const NDSDirectory& dir)
 	return bytes;
 }
 
-static unsigned fntByteCountHeader(const NDSDirectory& root)
+static u32 fntByteCountHeader(const NDSDirectory& root)
 {
 	return (fntDirectoryCount(root) + 1) * 8;
 }
 
-static unsigned fntWriteDirectory(const NDSDirectory& dir, unsigned char* fnt, unsigned offset, unsigned parentID)
+static u32 fntWriteDirectory(const NDSDirectory& dir, u8* fnt, u32 offset, u32 parentID)
 {
-	unsigned* ufnt = reinterpret_cast<unsigned*>(fnt);
-	unsigned short* sfnt = reinterpret_cast<unsigned short*>(fnt);
+	u32* ufnt = reinterpret_cast<u32*>(fnt);
+	u16* sfnt = reinterpret_cast<u16*>(fnt);
 	ufnt[(dir.directoryID & 0xFFF) * 2] = offset;
 	sfnt[(dir.directoryID & 0xFFF) * 4 + 2] = dir.firstFileID;
 	sfnt[(dir.directoryID & 0xFFF) * 4 + 3] = parentID;
 
-	for (unsigned i = 0; i < dir.files.size(); i++)
+	for (u32 i = 0; i < dir.files.size(); i++)
 	{
 		const std::string& filename = dir.files[i];
 
@@ -221,7 +221,7 @@ static unsigned fntWriteDirectory(const NDSDirectory& dir, unsigned char* fnt, u
 		offset += filename.length() + 1;
 	}
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 	{
 		const NDSDirectory& subdir = dir.dirs[i];
 		const std::string& dirname = subdir.dirName;
@@ -236,24 +236,24 @@ static unsigned fntWriteDirectory(const NDSDirectory& dir, unsigned char* fnt, u
 	fnt[offset] = 0x00;
 	offset++;
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 		offset = fntWriteDirectory(dir.dirs[i], fnt, offset, dir.directoryID);
 
 	return offset;
 
 }
 
-static void fntRebuild(std::vector<unsigned char>& rom, unsigned fntOffset, const NDSDirectory& root, unsigned& size)
+static void fntRebuild(std::vector<u8>& rom, u32 fntOffset, const NDSDirectory& root, u32& size)
 {
-	unsigned fntHeaderSize = fntByteCountHeader(root);
-	unsigned fntFnSize = fntByteCountFn(root);
+	u32 fntHeaderSize = fntByteCountHeader(root);
+	u32 fntFnSize = fntByteCountFn(root);
 	size = fntHeaderSize + fntFnSize;
 
 	romCheckBounds(rom, fntOffset + size);
 	fntWriteDirectory(root, &rom[fntOffset], fntHeaderSize, fntHeaderSize / 8);
 }
 
-static unsigned alignAddress(unsigned address, unsigned align)
+static u32 alignAddress(u32 address, u32 align)
 {
 	return ((address + align - 1) & ~(align - 1));
 }
@@ -287,11 +287,11 @@ static fs::path findInputFile(const fs::path& path)
 }
 
 static void writeOverlay(
-	std::vector<unsigned char>& rom,
-	unsigned ovID,
+	std::vector<u8>& rom,
+	u32 ovID,
 	OverlayEntry& entry,
 	const fs::path& dir,
-	unsigned& romOffset
+	u32& romOffset
 )
 {
 	const fs::path path = dir / (std::to_string(ovID) + ".bin");
@@ -301,14 +301,14 @@ static void writeOverlay(
 	const bool uncompressedExists = fs::is_regular_file(uncompressedPath);
 	const bool finalExists        = fs::is_regular_file(finalPath);
 
-	unsigned size;
+	u32 size;
 	std::ifstream fileStream;
 
 	if (uncompressedExists
 		&& (!finalExists || fs::last_write_time(finalPath) < fs::last_write_time(uncompressedPath)))
 	{
-		const unsigned uncompressedSize = fs::file_size(uncompressedPath);
-		std::vector<unsigned char> uncompressedData(uncompressedSize);
+		const u32 uncompressedSize = fs::file_size(uncompressedPath);
+		std::vector<u8> uncompressedData(uncompressedSize);
 
 		openInputFile(fileStream, uncompressedPath);
 		fileStream.read(reinterpret_cast<char*>(uncompressedData.data()), uncompressedSize);
@@ -356,14 +356,14 @@ static void writeOverlay(
 	romOffset += size;
 }
 
-static void nfsAddAndLink(std::vector<unsigned char>& rom, unsigned fatOffset, const NDSDirectory& dir, const fs::path& p, unsigned& romOffset)
+static void nfsAddAndLink(std::vector<u8>& rom, u32 fatOffset, const NDSDirectory& dir, const fs::path& p, u32& romOffset)
 {
-	unsigned short dirFileID = dir.firstFileID;
+	u16 dirFileID = dir.firstFileID;
 
-	for (unsigned i = 0; i < dir.files.size(); i++)
+	for (u32 i = 0; i < dir.files.size(); i++)
 	{
 		fs::path filePath = findInputFile(p / dir.files[i]);
-		unsigned fileSize = fs::file_size(filePath);
+		u32 fileSize = fs::file_size(filePath);
 
 		if (fileSize > oneGB)
 		{
@@ -379,7 +379,7 @@ static void nfsAddAndLink(std::vector<unsigned char>& rom, unsigned fatOffset, c
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fileSize);
 		fileStream.close();
 
-		unsigned* fatPtr = reinterpret_cast<unsigned*>(&rom[fatOffset]);
+		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
 		fatPtr[dirFileID * 2] = romOffset;
 		fatPtr[dirFileID * 2 + 1] = romOffset + fileSize;
 
@@ -388,20 +388,20 @@ static void nfsAddAndLink(std::vector<unsigned char>& rom, unsigned fatOffset, c
 		dirFileID++;
 	}
 
-	for (unsigned i = 0; i < dir.dirs.size(); i++)
+	for (u32 i = 0; i < dir.dirs.size(); i++)
 		nfsAddAndLink(rom, fatOffset, dir.dirs[i], p / dir.dirs[i].dirName, romOffset);
 }
 
 struct Config
 {
-	static constexpr unsigned keep = ~0u;
+	static constexpr u32 keep = ~0u;
 
 	fs::path outputPath;
-	unsigned char ovtReplFlag = 0xff;
-	unsigned arm9Entry = keep;
-	unsigned arm9Load  = keep;
-	unsigned arm7Entry = keep;
-	unsigned arm7Load  = keep;
+	u8 ovtReplFlag = 0xff;
+	u32 arm9Entry = keep;
+	u32 arm9Load  = keep;
+	u32 arm7Entry = keep;
+	u32 arm7Load  = keep;
 
 	Config(const fs::path& path):
 		outputPath(path)
@@ -443,7 +443,7 @@ struct Config
 				continue;
 			}
 
-			unsigned val;
+			u32 val;
 			try
 			{
 				val = std::stoul(std::string(sv), nullptr, 16);
@@ -453,7 +453,7 @@ struct Config
 				throw std::runtime_error("invalid value for '" + first + "'");
 			}
 
-			if (first == "ovt_repl_flag") ovtReplFlag = static_cast<unsigned char>(val);
+			if (first == "ovt_repl_flag") ovtReplFlag = static_cast<u8>(val);
 			else if (first == "arm9_entry") arm9Entry = val;
 			else if (first == "arm9_load" ) arm9Load  = val;
 			else if (first == "arm7_entry") arm7Entry = val;
@@ -475,7 +475,7 @@ struct Config
 			else
 			{
 				std::cout << std::setw(2*sizeof(val)) << std::setfill('0');
-				std::cout << static_cast<unsigned>(val) << '\n';
+				std::cout << static_cast<u32>(val) << '\n';
 			}
 		};
 
@@ -497,17 +497,17 @@ void pack(const fs::path& outputPath)
 	if (config.outputPath.empty())
 		throw std::invalid_argument("error: no output file given");
 
-	std::vector<unsigned char> rom;
+	std::vector<u8> rom;
 	NDSDirectory rootDir;
 
 	std::ifstream fileStream;
-	std::map<unsigned, OverlayEntry> ov7Entries;
-	std::map<unsigned, OverlayEntry> ov9Entries;
+	std::map<u32, OverlayEntry> ov7Entries;
+	std::map<u32, OverlayEntry> ov9Entries;
 
-	unsigned short freeOvFileID = 0;
-	unsigned short freeFileID = 0;
-	unsigned ovt9Offset, ovt7Offset, arm9Offset, arm7Offset, fntOffset, iconOffset, fatOffset;
-	unsigned romHeaderSize, fntSize, ovt7Size, ovt9Size, fatSize, arm7Size, arm9Size, romOffset, iconSize, rsaSize;
+	u16 freeOvFileID = 0;
+	u16 freeFileID = 0;
+	u32 ovt9Offset, ovt7Offset, arm9Offset, arm7Offset, fntOffset, iconOffset, fatOffset;
+	u32 romHeaderSize, fntSize, ovt7Size, ovt9Size, fatSize, arm7Size, arm9Size, romOffset, iconSize, rsaSize;
 
 	fs::path romHeaderPath = findInputFile("header.bin");
 	fs::path fntPath       = findInputFile("fnt.bin");
@@ -527,7 +527,7 @@ void pack(const fs::path& outputPath)
 
 	openInputFile(fileStream, romHeaderPath);
 
-	auto romHeader = std::make_unique<unsigned char[]>(0x4000);
+	auto romHeader = std::make_unique<u8[]>(0x4000);
 	fileStream.read(reinterpret_cast<char*>(romHeader.get()), romHeaderSize);
 	fileStream.close();
 
@@ -584,18 +584,18 @@ void pack(const fs::path& outputPath)
 		fileStream.read(reinterpret_cast<char*>(&rom[ovt9Offset]), ovt9Size);
 		fileStream.close();
 
-		for (unsigned i = 0; i < ovt9Size / 32; i++)
+		for (u32 i = 0; i < ovt9Size / 32; i++)
 		{
 			OverlayEntry e = { 0, 0, -1 };
 
 			if (rom[ovt9Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
-				unsigned short fid = *reinterpret_cast<unsigned short*>(&rom[ovt9Offset + i * 32 + 24]);
+				u16 fid = *reinterpret_cast<u16*>(&rom[ovt9Offset + i * 32 + 24]);
 				freeOvFileID = std::max(freeOvFileID + 0, fid + 1);
 				e.fileID = fid;
 			}
 			
-			ov9Entries[*reinterpret_cast<unsigned*>(&rom[ovt9Offset + i * 32])] = e;
+			ov9Entries[*reinterpret_cast<u32*>(&rom[ovt9Offset + i * 32])] = e;
 		}
 	}
 
@@ -650,18 +650,18 @@ void pack(const fs::path& outputPath)
 		fileStream.read(reinterpret_cast<char*>(&rom[ovt7Offset]), ovt7Size);
 		fileStream.close();
 
-		for (unsigned i = 0; i < ovt7Size / 32; i++)
+		for (u32 i = 0; i < ovt7Size / 32; i++)
 		{
 			OverlayEntry e = { 0, 0, -1 };
 
 			if (rom[ovt7Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
-				unsigned short fid = *reinterpret_cast<unsigned short*>(&rom[ovt7Offset + i * 32 + 24]);
+				u16 fid = *reinterpret_cast<u16*>(&rom[ovt7Offset + i * 32 + 24]);
 				freeOvFileID = std::max(freeOvFileID + 0, fid + 1);
 				e.fileID = fid;
 			}
 
-			ov7Entries[*reinterpret_cast<unsigned*>(&rom[ovt7Offset + i * 32])] = e;
+			ov7Entries[*reinterpret_cast<u32*>(&rom[ovt7Offset + i * 32])] = e;
 		}
 	}
 
@@ -691,11 +691,11 @@ void pack(const fs::path& outputPath)
 
 	std::cout << DINFO << "Assigning file IDs to new overlays\n";
 
-	for (unsigned i = 0; i < ovt9Size / 32; i++)
+	for (u32 i = 0; i < ovt9Size / 32; i++)
 	{
 		if (rom[ovt9Offset + i * 32 + 31] == config.ovtReplFlag)
 		{
-			unsigned ovID = *reinterpret_cast<unsigned*>(&rom[ovt9Offset + i * 32]);
+			u32 ovID = *reinterpret_cast<u32*>(&rom[ovt9Offset + i * 32]);
 			rom[ovt9Offset + i * 32 + 24] = freeFileID & 0x00FF;
 			rom[ovt9Offset + i * 32 + 25] = (freeFileID & 0xFF00) >> 8;
 			rom[ovt9Offset + i * 32 + 26] = 0;
@@ -707,11 +707,11 @@ void pack(const fs::path& outputPath)
 		}
 	}
 
-	for (unsigned i = 0; i < ovt7Size / 32; i++)
+	for (u32 i = 0; i < ovt7Size / 32; i++)
 	{
 		if (rom[ovt7Offset + i * 32 + 31] == config.ovtReplFlag)
 		{
-			unsigned ovID = *reinterpret_cast<unsigned*>(&rom[ovt7Offset + i * 32]);
+			u32 ovID = *reinterpret_cast<u32*>(&rom[ovt7Offset + i * 32]);
 			rom[ovt7Offset + i * 32 + 24] = freeFileID & 0x00FF;
 			rom[ovt7Offset + i * 32 + 25] = (freeFileID & 0xFF00) >> 8;
 			rom[ovt7Offset + i * 32 + 26] = 0;
@@ -723,7 +723,7 @@ void pack(const fs::path& outputPath)
 		}
 	}
 
-	unsigned short freeDirID = fntFindNextFreeDirID(rootDir);
+	u16 freeDirID = fntFindNextFreeDirID(rootDir);
 
 	if (const fs::path rootPath = fs::path("modified")/"final"/"root";
 		fs::is_directory(rootPath)
@@ -756,7 +756,7 @@ void pack(const fs::path& outputPath)
 	for (const auto& ov : ov9Entries)
 	{
 		const OverlayEntry& ov9e = ov.second;
-		unsigned* fatPtr = reinterpret_cast<unsigned*>(&rom[fatOffset]);
+		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
 
 		fatPtr[ov9e.fileID * 2] = ov9e.start;
 		fatPtr[ov9e.fileID * 2 + 1] = ov9e.end;
@@ -765,7 +765,7 @@ void pack(const fs::path& outputPath)
 	for (const auto& ov : ov7Entries)
 	{
 		const OverlayEntry& ov7e = ov.second;
-		unsigned* fatPtr = reinterpret_cast<unsigned*>(&rom[fatOffset]);
+		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
 
 		fatPtr[ov7e.fileID * 2] = ov7e.start;
 		fatPtr[ov7e.fileID * 2 + 1] = ov7e.end;
@@ -777,7 +777,7 @@ void pack(const fs::path& outputPath)
 
 	openInputFile(fileStream, iconPath);
 
-	unsigned short version;
+	u16 version;
 	fileStream.read(reinterpret_cast<char*>(&version), 2);
 
 	switch (version)
@@ -839,7 +839,7 @@ void pack(const fs::path& outputPath)
 	std::cout << DINFO << "Done building ROM\n";
 	std::cout << DINFO << "Fixing ROM header\n";
 
-	unsigned* urom = reinterpret_cast<unsigned*>(rom.data());
+	u32* urom = reinterpret_cast<u32*>(rom.data());
 	urom[8] = arm9Offset;
 	urom[11] = arm9Size;
 	urom[12] = arm7Offset;
@@ -861,9 +861,9 @@ void pack(const fs::path& outputPath)
 	if (config.arm7Entry != Config::keep) urom[13] = config.arm7Entry;
 	if (config.arm7Load  != Config::keep) urom[14] = config.arm7Load;
 
-	rom[20] = static_cast<unsigned char>(std::log2(rom.size() >> 17));
+	rom[20] = static_cast<u8>(std::log2(rom.size() >> 17));
 	
-	unsigned short* srom = reinterpret_cast<unsigned short*>(rom.data());
+	u16* srom = reinterpret_cast<u16*>(rom.data());
 	srom[175] = crc16(rom.data(), 350);
 
 	std::cout << DINFO << "Writing " << config.outputPath << '\n';
