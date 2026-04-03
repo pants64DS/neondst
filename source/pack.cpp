@@ -45,8 +45,8 @@ NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize)
 {
 	NDSDirectory dir;
 	u32 dirOffset = (dirID & 0xFFF) * 8;
-	u32 subOffset = *reinterpret_cast<u32*>(&fnt[dirOffset]);
-	dir.firstFileID = *reinterpret_cast<u16*>(&fnt[dirOffset + 4]);
+	u32 subOffset = readU32(fnt + dirOffset);
+	dir.firstFileID = readU16(fnt + dirOffset + 4);
 	dir.directoryID = dirID;
 
 	u32 relOffset = 0;
@@ -63,18 +63,18 @@ NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize)
 			std::cout << WARNING "FNT identifier 0x80 detected (reserved), skipping dir node\n";
 			break;
 		}
-		else if (len == 0x00)
+		else if (len == 0)
 			break;
 
 		bool isSubdir = len & 0x80;
 		len &= 0x7F;
 
-		name = std::string(reinterpret_cast<const char*>(&fnt[subOffset + relOffset]), len);
+		name = std::string(reinterpret_cast<const char*>(fnt + subOffset + relOffset), len);
 		relOffset += len;
 
 		if (isSubdir)
 		{
-			NDSDirectory subDir = buildFntTree(fnt, *reinterpret_cast<u16*>(&fnt[subOffset + relOffset]), fntSize);
+			NDSDirectory subDir = buildFntTree(fnt, readU16(fnt + subOffset + relOffset), fntSize);
 			subDir.dirName = name;
 			dir.dirs.push_back(subDir);
 			relOffset += 2;
@@ -206,11 +206,12 @@ static u32 fntByteCountHeader(const NDSDirectory& root)
 
 static u32 fntWriteDirectory(const NDSDirectory& dir, u8* fnt, u32 offset, u32 parentID)
 {
-	u32* ufnt = reinterpret_cast<u32*>(fnt);
-	u16* sfnt = reinterpret_cast<u16*>(fnt);
-	ufnt[(dir.directoryID & 0xFFF) * 2] = offset;
-	sfnt[(dir.directoryID & 0xFFF) * 4 + 2] = dir.firstFileID;
-	sfnt[(dir.directoryID & 0xFFF) * 4 + 3] = parentID;
+	writeU32(fnt + (dir.directoryID & 0xfff)*8, offset);
+
+	fnt[(dir.directoryID & 0xfff)*8 + 4] = dir.firstFileID & 0xff;
+	fnt[(dir.directoryID & 0xfff)*8 + 5] = dir.firstFileID >> 8;
+	fnt[(dir.directoryID & 0xfff)*8 + 6] = parentID & 0xff;
+	fnt[(dir.directoryID & 0xfff)*8 + 7] = parentID >> 8;
 
 	for (u32 i = 0; i < dir.files.size(); i++)
 	{
@@ -379,9 +380,9 @@ static void nfsAddAndLink(std::vector<u8>& rom, u32 fatOffset, const NDSDirector
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fileSize);
 		fileStream.close();
 
-		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
-		fatPtr[dirFileID * 2] = romOffset;
-		fatPtr[dirFileID * 2 + 1] = romOffset + fileSize;
+		u8* p = rom.data() + fatOffset + dirFileID*8;
+		writeU32(p, romOffset);
+		writeU32(p + 4, romOffset + fileSize);
 
 		romOffset += fileSize;
 		romOffset = alignAddress(romOffset, 4);
@@ -591,12 +592,12 @@ void pack(const fs::path& outputPath)
 
 			if (rom[ovt9Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
-				u16 fid = *reinterpret_cast<u16*>(&rom[ovt9Offset + i * 32 + 24]);
+				u16 fid = readU16(&rom[ovt9Offset + i * 32 + 24]);
 				freeOvFileID = std::max(freeOvFileID + 0, fid + 1);
 				e.fileID = fid;
 			}
 			
-			ov9Entries[*reinterpret_cast<u32*>(&rom[ovt9Offset + i * 32])] = e;
+			ov9Entries[readU32(&rom[ovt9Offset + i * 32])] = e;
 		}
 	}
 
@@ -657,12 +658,12 @@ void pack(const fs::path& outputPath)
 
 			if (rom[ovt7Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
-				u16 fid = *reinterpret_cast<u16*>(&rom[ovt7Offset + i * 32 + 24]);
+				u16 fid = readU16(&rom[ovt7Offset + i * 32 + 24]);
 				freeOvFileID = std::max(freeOvFileID + 0, fid + 1);
 				e.fileID = fid;
 			}
 
-			ov7Entries[*reinterpret_cast<u32*>(&rom[ovt7Offset + i * 32])] = e;
+			ov7Entries[readU32(&rom[ovt7Offset + i * 32])] = e;
 		}
 	}
 
@@ -696,7 +697,7 @@ void pack(const fs::path& outputPath)
 	{
 		if (rom[ovt9Offset + i * 32 + 31] == config.ovtReplFlag)
 		{
-			u32 ovID = *reinterpret_cast<u32*>(&rom[ovt9Offset + i * 32]);
+			u32 ovID = readU32(&rom[ovt9Offset + i * 32]);
 			rom[ovt9Offset + i * 32 + 24] = freeFileID & 0x00FF;
 			rom[ovt9Offset + i * 32 + 25] = (freeFileID & 0xFF00) >> 8;
 			rom[ovt9Offset + i * 32 + 26] = 0;
@@ -712,7 +713,7 @@ void pack(const fs::path& outputPath)
 	{
 		if (rom[ovt7Offset + i * 32 + 31] == config.ovtReplFlag)
 		{
-			u32 ovID = *reinterpret_cast<u32*>(&rom[ovt7Offset + i * 32]);
+			u32 ovID = readU32(&rom[ovt7Offset + i * 32]);
 			rom[ovt7Offset + i * 32 + 24] = freeFileID & 0x00FF;
 			rom[ovt7Offset + i * 32 + 25] = (freeFileID & 0xFF00) >> 8;
 			rom[ovt7Offset + i * 32 + 26] = 0;
@@ -757,19 +758,19 @@ void pack(const fs::path& outputPath)
 	for (const auto& ov : ov9Entries)
 	{
 		const OverlayEntry& ov9e = ov.second;
-		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
+		u8* fatPtr = rom.data() + fatOffset + ov9e.fileID*8;
 
-		fatPtr[ov9e.fileID * 2] = ov9e.start;
-		fatPtr[ov9e.fileID * 2 + 1] = ov9e.end;
+		writeU32(fatPtr, ov9e.start);
+		writeU32(fatPtr + 4, ov9e.end);
 	}
 
 	for (const auto& ov : ov7Entries)
 	{
 		const OverlayEntry& ov7e = ov.second;
-		u32* fatPtr = reinterpret_cast<u32*>(&rom[fatOffset]);
+		u8* fatPtr = rom.data() + fatOffset + ov7e.fileID*8;
 
-		fatPtr[ov7e.fileID * 2] = ov7e.start;
-		fatPtr[ov7e.fileID * 2 + 1] = ov7e.end;
+		writeU32(fatPtr, ov7e.start);
+		writeU32(fatPtr + 4, ov7e.end);
 	}
 
 	std::cout << "Adding icon / title " << iconPath << '\n';
@@ -840,32 +841,32 @@ void pack(const fs::path& outputPath)
 	std::cout << "Done building ROM\n";
 	std::cout << "Fixing ROM header\n";
 
-	u32* urom = reinterpret_cast<u32*>(rom.data());
-	urom[8] = arm9Offset;
-	urom[11] = arm9Size;
-	urom[12] = arm7Offset;
-	urom[15] = arm7Size;
-	urom[16] = fntOffset;
-	urom[17] = fntSize;
-	urom[18] = fatOffset;
-	urom[19] = fatSize;
-	urom[20] = ovt9Size ? ovt9Offset : 0;
-	urom[21] = ovt9Size;
-	urom[22] = ovt7Size ? ovt7Offset : 0;
-	urom[23] = ovt7Size;
-	urom[26] = iconOffset;
-	urom[32] = romOffset;
-	urom[1024] = urom[32];
+	writeU32(rom.data() +   0x20, arm9Offset);
+	writeU32(rom.data() +   0x2c, arm9Size);
+	writeU32(rom.data() +   0x30, arm7Offset);
+	writeU32(rom.data() +   0x3c, arm7Size);
+	writeU32(rom.data() +   0x40, fntOffset);
+	writeU32(rom.data() +   0x44, fntSize);
+	writeU32(rom.data() +   0x48, fatOffset);
+	writeU32(rom.data() +   0x4c, fatSize);
+	writeU32(rom.data() +   0x50, ovt9Size ? ovt9Offset : 0);
+	writeU32(rom.data() +   0x54, ovt9Size);
+	writeU32(rom.data() +   0x58, ovt7Size ? ovt7Offset : 0);
+	writeU32(rom.data() +   0x5c, ovt7Size);
+	writeU32(rom.data() +   0x68, iconOffset);
+	writeU32(rom.data() +   0x80, romOffset);
+	writeU32(rom.data() + 0x1000, romOffset);
 
-	if (config.arm9Entry != Config::keep) urom[ 9] = config.arm9Entry;
-	if (config.arm9Load  != Config::keep) urom[10] = config.arm9Load;
-	if (config.arm7Entry != Config::keep) urom[13] = config.arm7Entry;
-	if (config.arm7Load  != Config::keep) urom[14] = config.arm7Load;
+	if (config.arm9Entry != Config::keep) writeU32(rom.data() + 0x24, config.arm9Entry);
+	if (config.arm9Load  != Config::keep) writeU32(rom.data() + 0x28, config.arm9Load);
+	if (config.arm7Entry != Config::keep) writeU32(rom.data() + 0x34, config.arm7Entry);
+	if (config.arm7Load  != Config::keep) writeU32(rom.data() + 0x38, config.arm7Load);
 
 	rom[20] = static_cast<u8>(std::log2(rom.size() >> 17));
-	
-	u16* srom = reinterpret_cast<u16*>(rom.data());
-	srom[175] = crc16(rom.data(), 350);
+
+	const u16 crc = crc16(rom.data(), 0x15e);
+	rom[0x15e] = crc & 0xff;
+	rom[0x15f] = crc >> 8;
 
 	std::cout << "Writing " << config.outputPath << '\n';
 

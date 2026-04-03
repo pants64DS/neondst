@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <span>
 
 #include "common.h"
 
@@ -9,10 +10,8 @@ namespace fs = std::filesystem;
 // Defined in pack.cpp
 NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize);
 
-void dumpFntTree(const std::vector<u8>& rom, const NDSDirectory& dir, const fs::path& p, u32 fatOffset)
+static void dumpFntTree(const std::vector<u32>& romU32, const NDSDirectory& dir, const fs::path& p, u32 fatOffset)
 {
-	const u32* urom = reinterpret_cast<const u32*>(rom.data());
-
 	for (u32 i = 0; i < dir.files.size(); i++)
 	{
 		fs::path fp = p / dir.files[i];
@@ -20,15 +19,15 @@ void dumpFntTree(const std::vector<u8>& rom, const NDSDirectory& dir, const fs::
 		if (!fs::exists(fp))
 		{
 			u16 fid = dir.firstFileID + i;
-			u32 start = urom[(fatOffset + fid * 8) / 4];
-			u32 size = urom[(fatOffset + fid * 8 + 4) / 4] - start;
+			u32 start = romU32[(fatOffset + fid * 8) / 4];
+			u32 size = romU32[(fatOffset + fid * 8 + 4) / 4] - start;
 
 			std::ofstream outFile(fp, std::ios::binary | std::ios::out);
 
 			if (!outFile.is_open())
 				throw std::runtime_error("failed to create file " + fp.native());
 
-			outFile.write(reinterpret_cast<const char*>(&rom[start]), size);
+			outFile.write(reinterpret_cast<const char*>(romU32.data()) + start, size);
 			outFile.close();
 		}
 		else
@@ -44,18 +43,18 @@ void dumpFntTree(const std::vector<u8>& rom, const NDSDirectory& dir, const fs::
 		else
 			std::cout << WARNING "Directory " << sp << " already exists\n";
 
-		dumpFntTree(rom, dir.dirs[i], sp, fatOffset);
+		dumpFntTree(romU32, dir.dirs[i], sp, fatOffset);
 	}
 }
 
-void writeOutputFile(const fs::path& outputPath, const u8* data, std::size_t size)
+void writeOutputFile(const fs::path& outputPath, const void* data, std::size_t size)
 {
 	std::ofstream outFile(outputPath, std::ios::binary | std::ios::out);
 
 	if (!outFile.is_open())
 		throw std::runtime_error("failed to open file " + outputPath.native());
 
-	outFile.write(reinterpret_cast<const char*>(data), size);
+	outFile.write(static_cast<const char*>(data), size);
 }
 
 void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
@@ -80,33 +79,32 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	if (!ndsFile.good())
 		throw std::runtime_error("failed to open file " + ndsInputPath.native());
 
-	std::vector<u8> rom;
-	rom.resize(ndsFileSize);
+	std::vector<u32> romU32;
+	romU32.resize((ndsFileSize + 3) >> 2);
 
 	std::cout << "Reading NDS file " << ndsInputPath << '\n';
 
-	ndsFile.read(reinterpret_cast<char*>(rom.data()), ndsFileSize);
+	ndsFile.read(reinterpret_cast<char*>(romU32.data()), ndsFileSize);
 	ndsFile.close();
 
-	u32* urom = reinterpret_cast<u32*>(rom.data());
-	u16* srom = reinterpret_cast<u16*>(rom.data());
+	std::span<u8> romU8 = {reinterpret_cast<u8*>(romU32.data()), ndsFileSize};
 
-	u32 arm9Offset = urom[8];
-	u32 arm9Size = urom[11];
-	u32 arm7Offset = urom[12];
-	u32 arm7Size = urom[15];
-	u32 ovt9Offset = urom[20];
-	u32 ovt9Size = urom[21];
-	u32 ovt7Offset = urom[22];
-	u32 ovt7Size = urom[23];
-	u32 fntOffset = urom[16];
-	u32 fntSize = urom[17];
-	u32 fatOffset = urom[18];
-	u32 fatSize = urom[19];
-	u32 iconOffset = urom[26];
-	u32 rsaOffset = urom[32];
-	u32 iconSize = 0x840;
-	u32 rsaSize = 136;
+	u32 arm9Offset = romU32[8];
+	u32 arm9Size   = romU32[11];
+	u32 arm7Offset = romU32[12];
+	u32 arm7Size   = romU32[15];
+	u32 ovt9Offset = romU32[20];
+	u32 ovt9Size   = romU32[21];
+	u32 ovt7Offset = romU32[22];
+	u32 ovt7Size   = romU32[23];
+	u32 fntOffset  = romU32[16];
+	u32 fntSize    = romU32[17];
+	u32 fatOffset  = romU32[18];
+	u32 fatSize    = romU32[19];
+	u32 iconOffset = romU32[26];
+	u32 rsaOffset  = romU32[32];
+	u32 iconSize   = 0x840;
+	u32 rsaSize    = 136;
 
 	std::cout << "Creating directories\n";
 
@@ -121,7 +119,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting ROM header " << outputPath << '\n';
 
-		writeOutputFile(outputPath, rom.data(), 0x4000);
+		writeOutputFile(outputPath, romU32.data(), 0x4000);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -132,7 +130,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting ARM9 binary " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[arm9Offset], arm9Size);
+		writeOutputFile(outputPath, &romU8[arm9Offset], arm9Size);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -143,7 +141,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting ARM7 binary " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[arm7Offset], arm7Size);
+		writeOutputFile(outputPath, &romU8[arm7Offset], arm7Size);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -154,7 +152,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting ARM9 Overlay Table " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[ovt9Offset], ovt9Size);
+		writeOutputFile(outputPath, &romU8[ovt9Offset], ovt9Size);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -165,7 +163,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting ARM7 Overlay Table " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[ovt7Offset], ovt7Size);
+		writeOutputFile(outputPath, &romU8[ovt7Offset], ovt7Size);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -178,7 +176,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 		if (iconOffset)
 		{
-			switch (*reinterpret_cast<u16*>(&rom[iconOffset]))
+			switch (readU16(romU8.data() + iconOffset))
 			{
 			default:
 				std::cout << WARNING "Invalid Icon / Title ID, defaulting to 0x840\n";
@@ -203,7 +201,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 			iconSize = 0;
 		}
 
-		writeOutputFile(outputPath, &rom[iconOffset], iconSize);
+		writeOutputFile(outputPath, &romU8[iconOffset], iconSize);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -214,7 +212,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting File Name Table " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[fntOffset], fntSize);
+		writeOutputFile(outputPath, &romU8[fntOffset], fntSize);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -225,7 +223,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting File Allocation Table " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[fatOffset], fatSize);
+		writeOutputFile(outputPath, &romU8[fatOffset], fatSize);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -236,7 +234,7 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		std::cout << "Extracting RSA signature " << outputPath << '\n';
 
-		writeOutputFile(outputPath, &rom[rsaOffset], rsaSize);
+		writeOutputFile(outputPath, &romU8[rsaOffset], rsaSize);
 	}
 	else
 		std::cout << WARNING "File " << outputPath << " already exists\n";
@@ -247,15 +245,15 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		for (u32 i = 0; i < ovt9Size / 32; i++)
 		{
-			u16 fid = srom[(ovt9Offset + i * 32 + 24) / 2];
-			u32 ovStart = urom[(fatOffset + fid * 8) / 4];
-			u32 ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
+			u16 fid = readU16(romU8.data() + ovt9Offset + i * 32 + 24);
+			u32 ovStart = romU32[(fatOffset + fid * 8) / 4];
+			u32 ovSize = romU32[(fatOffset + fid * 8 + 4) / 4] - ovStart;
 			
-			outputPath = ov9Path / std::to_string(urom[(ovt9Offset + i * 32) / 4]);
+			outputPath = ov9Path / std::to_string(romU32[(ovt9Offset + i * 32) / 4]);
 			outputPath += ".bin";
 
 			if (!fs::exists(outputPath))
-				writeOutputFile(outputPath, &rom[ovStart], ovSize);
+				writeOutputFile(outputPath, &romU8[ovStart], ovSize);
 			else
 				std::cout << WARNING "ARM9 Overlay " << outputPath << " already exists\n";
 		}
@@ -267,16 +265,16 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 	{
 		for (u32 i = 0; i < ovt7Size / 32; i++)
 		{
-			u16 fid = srom[(ovt7Offset + i * 32 + 24) / 2];
-			u32 ovStart = urom[(fatOffset + fid * 8) / 4];
-			u32 ovSize = urom[(fatOffset + fid * 8 + 4) / 4] - ovStart;
+			u16 fid = readU16(romU8.data() + ovt7Offset + i * 32 + 24);
+			u32 ovStart = romU32[(fatOffset + fid * 8) / 4];
+			u32 ovSize = romU32[(fatOffset + fid * 8 + 4) / 4] - ovStart;
 
 			outputPath = ov7Path / "overlay7_";
-			outputPath += std::to_string(urom[(ovt7Offset + i * 32) / 4]);
+			outputPath += std::to_string(romU32[(ovt7Offset + i * 32) / 4]);
 			outputPath += ".bin";
 
 			if (!fs::exists(outputPath))
-				writeOutputFile(outputPath, &rom[ovStart], ovSize);
+				writeOutputFile(outputPath, &romU8[ovStart], ovSize);
 			else
 				std::cout << WARNING "ARM7 Overlay " << outputPath << " already exists\n";
 		}
@@ -284,8 +282,8 @@ void extract(const fs::path& ndsInputPath, const fs::path& fsOutputPath)
 
 	std::cout << "Extracting Data files\n";
 
-	NDSDirectory rootDir = buildFntTree(&rom[fntOffset], 0xF000, fntSize);
-	dumpFntTree(rom, rootDir, dataPath, fatOffset);
+	NDSDirectory rootDir = buildFntTree(&romU8[fntOffset], 0xF000, fntSize);
+	dumpFntTree(romU32, rootDir, dataPath, fatOffset);
 
 	std::cout << "Done\n";
 }

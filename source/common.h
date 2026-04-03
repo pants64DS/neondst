@@ -25,7 +25,20 @@ struct NDSDirectory
 
 constexpr std::size_t oneGB = 1ull << 30;
 
+inline u32 readU16(const u8* p)
+{
+	return p[0] | p[1] << 8;
+}
+
 inline u32 readU32(const u8* p)
 {
 	return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+}
+
+inline void writeU32(u8* p, u32 v)
+{
+	p[0] = v       & 0xff;
+	p[1] = v >>  8 & 0xff;
+	p[2] = v >> 16 & 0xff;
+	p[3] = v >> 24;
 }
