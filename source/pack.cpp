@@ -6,7 +6,6 @@
 #include <vector>
 #include <unordered_map>
 #include <map>
-#include <cmath>
 #include <cstring>
 
 #include "common.h"
@@ -499,7 +498,6 @@ void pack(const fs::path& outputPath)
 	if (config.outputPath.empty())
 		throw std::invalid_argument("no output file given");
 
-	std::vector<u8> rom;
 	NDSDirectory rootDir;
 
 	std::ifstream fileStream;
@@ -529,19 +527,16 @@ void pack(const fs::path& outputPath)
 
 	openInputFile(fileStream, romHeaderPath);
 
-	auto romHeader = std::make_unique<u8[]>(0x4000);
-	fileStream.read(reinterpret_cast<char*>(romHeader.get()), romHeaderSize);
+	std::vector<u8> rom(0x4000);
+	fileStream.read(reinterpret_cast<char*>(rom.data()), romHeaderSize);
 	fileStream.close();
 
+	rom.reserve(readU32(rom.data() + 0x80)*3 >> 1);
+
 	if (romHeaderSize == 0x200)
-		std::fill(romHeader.get() + 0x200, romHeader.get() + 0x4000, 0);
+		std::fill(rom.data() + 0x200, rom.data() + 0x4000, 0);
 
-	if (romHeader[20] > 13)
-		throw std::length_error("final ROM size in header exceeds 1 GB\n");
-
-	rom.resize(0x20000 << romHeader[20], 0xFF);
 	romOffset = 0;
-	std::memcpy(rom.data(), romHeader.get(), 0x4000);
 	romOffset += 0x4000;
 
 	std::cout << "Adding ARM9 binary " << arm9Path << '\n';
@@ -862,7 +857,7 @@ void pack(const fs::path& outputPath)
 	if (config.arm7Entry != Config::keep) writeU32(rom.data() + 0x34, config.arm7Entry);
 	if (config.arm7Load  != Config::keep) writeU32(rom.data() + 0x38, config.arm7Load);
 
-	rom[20] = static_cast<u8>(std::log2(rom.size() >> 17));
+	rom[20] = std::max(std::bit_width(rom.size() - 1) - 17, 0);
 
 	const u16 crc = crc16(rom.data(), 0x15e);
 	rom[0x15e] = crc & 0xff;
