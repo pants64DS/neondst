@@ -32,9 +32,5 @@ void Commands::help(std::string_view commandName)
 	}
 
 	if (!found)
-	{
 		std::cout << ERROR "'" << commandName << "' is not a neondst command\n";
-
-		Commands::help("help");
-	}
 }

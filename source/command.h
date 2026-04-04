@@ -90,11 +90,8 @@ namespace Commands
 	void init(const fs::path& cleanRomPath);
 	void decompress(std::span<const fs::path> relativePaths);
 	void build(const fs::path& outputPath);
-	void start();
 	void diff_save();
 	void diff_apply();
-	void temp_save(const fs::path& tempRomPath);
-	void temp_apply(const fs::path& tempRomPath);
 	void help(std::string_view command = "");
 	void version();
 }
@@ -103,11 +100,8 @@ inline const Command commands[] = {
 	{Commands::init,       "init",       nullptr, "<clean ROM>", 1},
 	{Commands::decompress, "decompress", nullptr, "<files...>", 1},
 	{Commands::build,      "build",      nullptr, "[<output ROM>]"},
-	{Commands::start,      "start",      nullptr, ""},
 	{Commands::diff_save,  "diff",       "save",  ""},
 	{Commands::diff_apply, "diff",       "apply", ""},
-	{Commands::temp_save,  "temp",       "save",  "[<temporary ROM>]"},
-	{Commands::temp_apply, "temp",       "apply", "[<temporary ROM>]"},
 	{Commands::help,       "help",       nullptr, "[<command>]"},
 	{Commands::version,    "version",    nullptr, ""}
 };
