@@ -1,2 +1,7 @@
-# example config file
+# Example config file
+
+# Set the default output path:
 output rom.nds
+
+# Pad the ROM to the full device capacity with ff:
+pad ff

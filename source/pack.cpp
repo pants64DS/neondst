@@ -31,13 +31,13 @@ struct OverlayEntry
 	u16 fileID;
 };
 
-static void romCheckBounds(std::vector<u8>& rom, u32 requiredSize)
+static void romCheckBounds(std::vector<u8>& rom, u32 requiredSize, u8 padding)
 {
 	if (oneGB < requiredSize)
 		throw std::length_error("ROM trying to grow larger than 1 GB");
 
 	if (rom.size() < requiredSize)
-		rom.resize(requiredSize, 0xff);
+		rom.resize(requiredSize, padding);
 }
 
 NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize)
@@ -243,13 +243,13 @@ static u32 fntWriteDirectory(const NDSDirectory& dir, u8* fnt, u32 offset, u32 p
 
 }
 
-static void fntRebuild(std::vector<u8>& rom, u32 fntOffset, const NDSDirectory& root, u32& size)
+static void fntRebuild(std::vector<u8>& rom, u32 fntOffset, const NDSDirectory& root, u32& size, u8 padding)
 {
 	u32 fntHeaderSize = fntByteCountHeader(root);
 	u32 fntFnSize = fntByteCountFn(root);
 	size = fntHeaderSize + fntFnSize;
 
-	romCheckBounds(rom, fntOffset + size);
+	romCheckBounds(rom, fntOffset + size, padding);
 	fntWriteDirectory(root, &rom[fntOffset], fntHeaderSize, fntHeaderSize / 8);
 }
 
@@ -291,7 +291,8 @@ static void writeOverlay(
 	u32 ovID,
 	OverlayEntry& entry,
 	const fs::path& dir,
-	u32& romOffset
+	u32& romOffset,
+	u8 padding
 )
 {
 	const fs::path path = dir / (std::to_string(ovID) + ".bin");
@@ -326,7 +327,7 @@ static void writeOverlay(
 		std::cout << "Compressed " << uncompressedPath << " -> " << finalPath << '\n';
 		std::cout << "Replacing overlay " << ovID << " with " << finalPath << '\n';
 
-		romCheckBounds(rom, romOffset + size);
+		romCheckBounds(rom, romOffset + size, padding);
 		std::memcpy(&rom[romOffset], compressedData.data(), size);
 	}
 	else if (finalExists)
@@ -334,7 +335,7 @@ static void writeOverlay(
 		std::cout << "Replacing overlay " << ovID << " with " << finalPath << '\n';
 
 		size = fs::file_size(finalPath);
-		romCheckBounds(rom, romOffset + size);
+		romCheckBounds(rom, romOffset + size, padding);
 		openInputFile(fileStream, finalPath);
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
 	}
@@ -346,7 +347,7 @@ static void writeOverlay(
 			throw std::runtime_error("could not find overlay file: " + path.native());
 
 		size = fs::file_size(cleanPath);
-		romCheckBounds(rom, romOffset + size);
+		romCheckBounds(rom, romOffset + size, padding);
 		openInputFile(fileStream, cleanPath);
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
 	}
@@ -356,7 +357,14 @@ static void writeOverlay(
 	romOffset += size;
 }
 
-static void nfsAddAndLink(std::vector<u8>& rom, u32 fatOffset, const NDSDirectory& dir, const fs::path& p, u32& romOffset)
+static void nfsAddAndLink(
+	std::vector<u8>& rom,
+	u32 fatOffset,
+	const NDSDirectory& dir,
+	const fs::path& p,
+	u32& romOffset,
+	u8 padding
+)
 {
 	u16 dirFileID = dir.firstFileID;
 
@@ -375,7 +383,7 @@ static void nfsAddAndLink(std::vector<u8>& rom, u32 fatOffset, const NDSDirector
 		std::ifstream fileStream;
 		openInputFile(fileStream, filePath);
 
-		romCheckBounds(rom, romOffset + fileSize);
+		romCheckBounds(rom, romOffset + fileSize, padding);
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fileSize);
 		fileStream.close();
 
@@ -389,15 +397,25 @@ static void nfsAddAndLink(std::vector<u8>& rom, u32 fatOffset, const NDSDirector
 	}
 
 	for (u32 i = 0; i < dir.dirs.size(); i++)
-		nfsAddAndLink(rom, fatOffset, dir.dirs[i], p / dir.dirs[i].dirName, romOffset);
+		nfsAddAndLink(rom, fatOffset, dir.dirs[i], p / dir.dirs[i].dirName, romOffset, padding);
+}
+
+static u8 toU8(u32 val, const std::string& name)
+{
+	if (val < 0x100)
+		return static_cast<u8>(val);
+
+	throw std::invalid_argument('\'' + name + "' must be a hex value from 0 to ff");
 }
 
 struct Config
 {
 	static constexpr u32 keep = ~0u;
+	static constexpr s16 noPadding = -1;
 
 	fs::path outputPath;
 	u8 ovtReplFlag = 0xff;
+	s16 padding = noPadding;
 	u32 arm9Entry = keep;
 	u32 arm9Load  = keep;
 	u32 arm7Entry = keep;
@@ -453,7 +471,8 @@ struct Config
 				throw std::runtime_error("invalid value for '" + first + "'");
 			}
 
-			if (first == "ovt_repl_flag") ovtReplFlag = static_cast<u8>(val);
+			if (first == "ovt_repl_flag") ovtReplFlag = toU8(val, first);
+			else if (first == "pad") padding = toU8(val, first);
 			else if (first == "arm9_entry") arm9Entry = val;
 			else if (first == "arm9_load" ) arm9Load  = val;
 			else if (first == "arm7_entry") arm7Entry = val;
@@ -545,7 +564,7 @@ void pack(const fs::path& outputPath)
 	checkFileSize(arm9Path, arm9Size, 0x3bfe00);
 
 	openInputFile(fileStream, arm9Path);
-	romCheckBounds(rom, romOffset + arm9Size);
+	romCheckBounds(rom, romOffset + arm9Size, config.padding);
 	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), arm9Size);
 	fileStream.close();
 
@@ -571,19 +590,19 @@ void pack(const fs::path& outputPath)
 	else
 		romOffset = alignAddress(romOffset, 4);
 
-	romCheckBounds(rom, romOffset + 4);
+	romCheckBounds(rom, romOffset + 4, config.padding);
 	ovt9Offset = romOffset;
 
 	if (ovt9Size)
 	{
 		openInputFile(fileStream, ovt9Path);
-		romCheckBounds(rom, romOffset + ovt9Size);
+		romCheckBounds(rom, romOffset + ovt9Size, config.padding);
 		fileStream.read(reinterpret_cast<char*>(&rom[ovt9Offset]), ovt9Size);
 		fileStream.close();
 
 		for (u32 i = 0; i < ovt9Size / 32; i++)
 		{
-			OverlayEntry e = { 0, 0, -1 };
+			OverlayEntry e = { 0, 0, 0xffff };
 
 			if (rom[ovt9Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
@@ -601,7 +620,7 @@ void pack(const fs::path& outputPath)
 	std::cout << "Adding ARM9 overlay files\n";
 
 	for (auto& e : ov9Entries)
-		writeOverlay(rom, e.first, e.second, "overlay9", romOffset);
+		writeOverlay(rom, e.first, e.second, "overlay9", romOffset, config.padding);
 
 	romOffset = alignAddress(romOffset, 512);
 
@@ -611,7 +630,7 @@ void pack(const fs::path& outputPath)
 	checkFileSize(arm7Path, arm7Size, 0x3bfe00);
 
 	openInputFile(fileStream, arm7Path);
-	romCheckBounds(rom, romOffset + arm7Size);
+	romCheckBounds(rom, romOffset + arm7Size, config.padding);
 	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), arm7Size);
 	fileStream.close();
 
@@ -637,19 +656,19 @@ void pack(const fs::path& outputPath)
 	else
 		romOffset = alignAddress(romOffset, 4);
 
-	romCheckBounds(rom, romOffset + 4);
+	romCheckBounds(rom, romOffset + 4, config.padding);
 	ovt7Offset = romOffset;
 
 	if (ovt7Size)
 	{
 		openInputFile(fileStream, ovt7Path);
-		romCheckBounds(rom, romOffset + ovt7Size);
+		romCheckBounds(rom, romOffset + ovt7Size, config.padding);
 		fileStream.read(reinterpret_cast<char*>(&rom[ovt7Offset]), ovt7Size);
 		fileStream.close();
 
 		for (u32 i = 0; i < ovt7Size / 32; i++)
 		{
-			OverlayEntry e = { 0, 0, -1 };
+			OverlayEntry e = { 0, 0, 0xffff };
 
 			if (rom[ovt7Offset + i * 32 + 31] != config.ovtReplFlag)
 			{
@@ -667,7 +686,7 @@ void pack(const fs::path& outputPath)
 	std::cout << "Adding ARM7 overlay files\n";
 
 	for (auto& e : ov7Entries)
-		writeOverlay(rom, e.first, e.second, "overlay7", romOffset);
+		writeOverlay(rom, e.first, e.second, "overlay7", romOffset, config.padding);
 
 	romOffset = alignAddress(romOffset, 4);
 
@@ -677,7 +696,7 @@ void pack(const fs::path& outputPath)
 	checkFileSize(fntPath, fntSize, oneGB);
 
 	openInputFile(fileStream, fntPath);
-	romCheckBounds(rom, romOffset + fntSize);
+	romCheckBounds(rom, romOffset + fntSize, config.padding);
 	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fntSize);
 	fileStream.close();
 
@@ -728,7 +747,7 @@ void pack(const fs::path& outputPath)
 	{
 		std::cout << "Rebuilding FNT\n";
 
-		fntRebuild(rom, romOffset, rootDir, fntSize);
+		fntRebuild(rom, romOffset, rootDir, fntSize, config.padding);
 	}
 	else
 		std::cout << "Keeping the original FNT\n";
@@ -740,7 +759,7 @@ void pack(const fs::path& outputPath)
 	std::cout << "Allocating FAT\n";
 
 	fatSize = freeFileID * 8;
-	romCheckBounds(rom, romOffset + fatSize);
+	romCheckBounds(rom, romOffset + fatSize, config.padding);
 
 	fatOffset = romOffset;
 	std::memset(&rom[fatOffset], 0x00, fatSize);
@@ -802,7 +821,7 @@ void pack(const fs::path& outputPath)
 
 	fileStream.seekg(-2, std::ios::cur);
 
-	romCheckBounds(rom, romOffset + iconSize);
+	romCheckBounds(rom, romOffset + iconSize, config.padding);
 	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), iconSize);
 	fileStream.close();
 
@@ -813,7 +832,7 @@ void pack(const fs::path& outputPath)
 
 	std::cout << "Adding NitroROM filesystem\n";
 
-	nfsAddAndLink(rom, fatOffset, rootDir, "root", romOffset);
+	nfsAddAndLink(rom, fatOffset, rootDir, "root", romOffset, config.padding);
 
 	std::cout << "Adding RSA signature " << rsaPath << '\n';
 
@@ -829,7 +848,7 @@ void pack(const fs::path& outputPath)
 	}
 	
 	openInputFile(fileStream, rsaPath);
-	romCheckBounds(rom, romOffset + rsaSize);
+	romCheckBounds(rom, romOffset + rsaSize, config.padding);
 	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), rsaSize);
 	fileStream.close();
 
@@ -859,6 +878,10 @@ void pack(const fs::path& outputPath)
 
 	rom[20] = std::max(std::bit_width(rom.size() - 1) - 17, 0);
 
+	std::cout << "ROM device capacity: 0x" << std::hex << (0x20000 << rom[20]);
+	std::cout << " bytes\nUsed ROM space: 0x" << rom.size();
+	std::cout << " bytes\n" << std::dec;
+
 	const u16 crc = crc16(rom.data(), 0x15e);
 	rom[0x15e] = crc & 0xff;
 	rom[0x15f] = crc >> 8;
@@ -871,6 +894,16 @@ void pack(const fs::path& outputPath)
 		throw std::runtime_error("failed to create file " + config.outputPath.native());
 
 	outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+
+	if (config.padding != Config::noPadding)
+	{
+		const auto size = (0x20000 << rom[20]) - rom.size();
+		rom.clear();
+		rom.resize(size, config.padding);
+
+		outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+	}
+
 	outputStream.close();
 
 	std::cout << "Successfully written NDS image " << config.outputPath << '\n';

@@ -4,7 +4,7 @@ OUTPUT   := neondst
 INCLUDES := $(SOURCES)
 INCLUDE  := $(foreach dir,$(INCLUDES),-I$(dir))
 CXX      := g++
-CXXFLAGS := $(INCLUDE) -std=c++23 -Wall -Wextra -Wno-narrowing -O3
+CXXFLAGS := $(INCLUDE) -std=c++23 -Wall -Wextra -O3
 LDFLAGS  := -static-libgcc -static-libstdc++
 
 CPPFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
