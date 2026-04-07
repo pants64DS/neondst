@@ -12,7 +12,7 @@ namespace BLZ
 	 * 
 	 * @return The compressed data.
 	 */
-	std::vector<u8> compress(const std::vector<u8>& data);
+	std::vector<u8> compress(const std::vector<u8>& data, u8 padding = 0xff);
 
 	/**
 	 * @brief Uncompress module data.

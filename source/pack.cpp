@@ -292,6 +292,7 @@ static void writeOverlay(
 	OverlayEntry& entry,
 	const fs::path& dir,
 	u32& romOffset,
+	u32 ovtOffset,
 	u8 padding
 )
 {
@@ -304,6 +305,7 @@ static void writeOverlay(
 
 	u32 size;
 	std::ifstream fileStream;
+	bool clean = false;
 
 	if (uncompressedExists
 		&& (!finalExists || fs::last_write_time(finalPath) < fs::last_write_time(uncompressedPath)))
@@ -314,9 +316,13 @@ static void writeOverlay(
 		openInputFile(fileStream, uncompressedPath);
 		fileStream.read(reinterpret_cast<char*>(uncompressedData.data()), uncompressedSize);
 
-		const auto compressedData = BLZ::compress(uncompressedData);
+		std::cout << "Compressing " << uncompressedPath << " -> " << finalPath << "\n" WARNING;
+		std::cout << "the compression feature is experimental; it may produce incorrect results\n";
+
+		const auto compressedData = BLZ::compress(uncompressedData, padding);
 		size = compressedData.size();
 
+		fs::create_directories(finalPath.parent_path());
 		std::ofstream compressedFile(finalPath, std::ios::binary | std::ios::out);
 
 		if (!compressedFile.is_open())
@@ -324,7 +330,6 @@ static void writeOverlay(
 
 		compressedFile.write(reinterpret_cast<const char*>(compressedData.data()), size);
 
-		std::cout << "Compressed " << uncompressedPath << " -> " << finalPath << '\n';
 		std::cout << "Replacing overlay " << ovID << " with " << finalPath << '\n';
 
 		romCheckBounds(rom, romOffset + size, padding);
@@ -341,6 +346,7 @@ static void writeOverlay(
 	}
 	else
 	{
+		clean = true;
 		const fs::path cleanPath = "clean" / ("raw" / path);
 
 		if (!fs::is_regular_file(cleanPath))
@@ -350,6 +356,19 @@ static void writeOverlay(
 		romCheckBounds(rom, romOffset + size, padding);
 		openInputFile(fileStream, cleanPath);
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
+	}
+
+	if (!clean)
+	{
+		if (size >= 1 << 24)
+			throw std::length_error("size of " + finalPath.native() + " exceeds 16 MB");
+
+		// Adjust the compressed size of the overlay in the overlay table
+		u8* p = rom.data() + ovtOffset + 0x20*ovID + 0x1c;
+
+		p[0] = size       & 0xff;
+		p[1] = size >>  8 & 0xff;
+		p[2] = size >> 16 & 0xff;
 	}
 
 	entry.start = romOffset;
@@ -620,7 +639,7 @@ void pack(const fs::path& outputPath)
 	std::cout << "Adding ARM9 overlay files\n";
 
 	for (auto& e : ov9Entries)
-		writeOverlay(rom, e.first, e.second, "overlay9", romOffset, config.padding);
+		writeOverlay(rom, e.first, e.second, "overlay9", romOffset, ovt9Offset, config.padding);
 
 	romOffset = alignAddress(romOffset, 512);
 
@@ -686,7 +705,7 @@ void pack(const fs::path& outputPath)
 	std::cout << "Adding ARM7 overlay files\n";
 
 	for (auto& e : ov7Entries)
-		writeOverlay(rom, e.first, e.second, "overlay7", romOffset, config.padding);
+		writeOverlay(rom, e.first, e.second, "overlay7", romOffset, ovt7Offset, config.padding);
 
 	romOffset = alignAddress(romOffset, 4);
 

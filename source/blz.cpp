@@ -164,7 +164,7 @@ static void UncompressBackward(void* bottom)
 
 namespace BLZ
 {
-	std::vector<u8> compress(const std::vector<u8>& data)
+	std::vector<u8> compress(const std::vector<u8>& data, u8 padding)
 	{
 		const size_t dataSize = data.size();
 		std::vector<u8> dest(dataSize);
@@ -174,21 +174,29 @@ namespace BLZ
 		if (reduction == (size_t)-1)
 			throw std::runtime_error("compression failed");
 
-		const size_t destSize = dest.size() - reduction;
+		const ptrdiff_t destSize = dest.size() - reduction;
 		std::memmove(dest.data(), dest.data() + reduction, destSize);
-		dest.resize(destSize + 8);
 
-		const size_t offset1 = reduction - 8;
-		const size_t offset2 = dest.size();
+		const size_t paddingSize = -destSize & 3;
+		const size_t footerOffset = destSize + paddingSize;
 
-		dest[destSize]     =  offset2        & 0xff;
-		dest[destSize + 1] = (offset2 >>  8) & 0xff;
-		dest[destSize + 2] = (offset2 >> 16) & 0xff;
-		dest[destSize + 3] = 8;
-		dest[destSize + 4] =  offset1        & 0xff;
-		dest[destSize + 5] = (offset1 >>  8) & 0xff;
-		dest[destSize + 6] = (offset1 >> 16) & 0xff;
-		dest[destSize + 7] = (offset1 >> 24) & 0xff;
+		dest.resize(footerOffset + 8);
+		std::memset(dest.data() + destSize, padding, paddingSize);
+
+		// full compressed size, including padding and footer
+		const size_t offset1 = dest.size();
+
+		// (uncompressed size) - (full compressed size, including padding and footer)
+		const size_t offset2 = reduction - paddingSize - 8;
+
+		dest[footerOffset]     =  offset1        & 0xff;
+		dest[footerOffset + 1] = (offset1 >>  8) & 0xff;
+		dest[footerOffset + 2] = (offset1 >> 16) & 0xff;
+		dest[footerOffset + 3] = paddingSize + 8; // size of footer + padding
+		dest[footerOffset + 4] =  offset2        & 0xff;
+		dest[footerOffset + 5] = (offset2 >>  8) & 0xff;
+		dest[footerOffset + 6] = (offset2 >> 16) & 0xff;
+		dest[footerOffset + 7] = (offset2 >> 24) & 0xff;
 
 		return dest;
 	}
