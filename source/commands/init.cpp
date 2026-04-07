@@ -10,6 +10,6 @@ void Commands::init(const fs::path& cleanRomPath)
 	extract(cleanRomPath, clean / "raw");
 
 	fs::create_directory(clean / "decompressed");
-	fs::create_directories(modified / "uncompressed");
+	fs::create_directories(modified / "to-be-compressed");
 	fs::create_directory(modified / "final");
 }

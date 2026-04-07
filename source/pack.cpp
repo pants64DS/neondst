@@ -268,9 +268,9 @@ static void openInputFile(std::ifstream& fileStream, const fs::path& path)
 
 static fs::path findInputFile(const fs::path& path)
 {
-	const fs::path modifiedUncompressedPath = "modified" / ("uncompressed" / path);
+	const fs::path toBeCompressedPath = "modified" / ("to-be-compressed" / path);
 
-	if (fs::is_regular_file(modifiedUncompressedPath))
+	if (fs::is_regular_file(toBeCompressedPath))
 		throw std::runtime_error("compression is only supported for overlay, not for " + path.native());
 
 	const fs::path modifiedFinalPath = "modified" / ("final" / path);
@@ -297,26 +297,26 @@ static void writeOverlay(
 )
 {
 	const fs::path path = dir / (std::to_string(ovID) + ".bin");
-	const fs::path uncompressedPath = "modified" / ("uncompressed" / path);
-	const fs::path finalPath        = "modified" / ("final" / path);
+	const fs::path toBeCompressedPath = "modified" / ("to-be-compressed" / path);
+	const fs::path finalPath          = "modified" / ("final" / path);
 
-	const bool uncompressedExists = fs::is_regular_file(uncompressedPath);
-	const bool finalExists        = fs::is_regular_file(finalPath);
+	const bool toBeCompressedExists = fs::is_regular_file(toBeCompressedPath);
+	const bool finalExists          = fs::is_regular_file(finalPath);
 
 	u32 size;
 	std::ifstream fileStream;
 	bool clean = false;
 
-	if (uncompressedExists
-		&& (!finalExists || fs::last_write_time(finalPath) < fs::last_write_time(uncompressedPath)))
+	if (toBeCompressedExists
+		&& (!finalExists || fs::last_write_time(finalPath) < fs::last_write_time(toBeCompressedPath)))
 	{
-		const u32 uncompressedSize = fs::file_size(uncompressedPath);
+		const u32 uncompressedSize = fs::file_size(toBeCompressedPath);
 		std::vector<u8> uncompressedData(uncompressedSize);
 
-		openInputFile(fileStream, uncompressedPath);
+		openInputFile(fileStream, toBeCompressedPath);
 		fileStream.read(reinterpret_cast<char*>(uncompressedData.data()), uncompressedSize);
 
-		std::cout << "Compressing " << uncompressedPath << " -> " << finalPath << "\n" WARNING;
+		std::cout << "Compressing " << toBeCompressedPath << " -> " << finalPath << "\n" WARNING;
 		std::cout << "the compression feature is experimental; it may produce incorrect results\n";
 
 		const auto compressedData = BLZ::compress(uncompressedData, padding);
