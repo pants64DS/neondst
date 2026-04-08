@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.h"
+
 #include <stdexcept>
 #include <filesystem>
 #include <string_view>
@@ -9,8 +11,6 @@
 #include <vector>
 #include <limits>
 #include <span>
-
-namespace fs = std::filesystem;
 
 template<class T>
 std::remove_reference_t<T> parse(const char* sv) { return sv; };
@@ -90,6 +90,7 @@ namespace Commands
 	void init(const fs::path& cleanRomPath);
 	void decompress(std::span<const fs::path> relativePaths);
 	void build(const fs::path& outputPath);
+	void apply(const fs::path& romPath);
 	void diff_save();
 	void diff_apply();
 	void help(std::string_view command = "");
@@ -100,6 +101,7 @@ inline const Command commands[] = {
 	{Commands::init,       "init",       nullptr, "<clean ROM>", 1},
 	{Commands::decompress, "decompress", nullptr, "<files...>", 1},
 	{Commands::build,      "build",      nullptr, "[<output ROM>]"},
+	{Commands::apply,      "apply",      nullptr, "[<input ROM>]"},
 	{Commands::diff_save,  "diff",       "save",  ""},
 	{Commands::diff_apply, "diff",       "apply", ""},
 	{Commands::help,       "help",       nullptr, "[<command>]"},

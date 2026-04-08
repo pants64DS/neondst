@@ -9,10 +9,9 @@
 #include <cstring>
 
 #include "common.h"
+#include "config.h"
 #include "crc.h"
 #include "blz.hpp"
-
-namespace fs = std::filesystem;
 
 static void checkFileSize(const fs::path& path, std::size_t size, std::size_t maxSize)
 {
@@ -406,9 +405,9 @@ static void nfsAddAndLink(
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fileSize);
 		fileStream.close();
 
-		u8* p = rom.data() + fatOffset + dirFileID*8;
-		writeU32(p, romOffset);
-		writeU32(p + 4, romOffset + fileSize);
+		u8* ptr = rom.data() + fatOffset + dirFileID*8;
+		writeU32(ptr, romOffset);
+		writeU32(ptr + 4, romOffset + fileSize);
 
 		romOffset += fileSize;
 		romOffset = alignAddress(romOffset, 4);
@@ -419,121 +418,14 @@ static void nfsAddAndLink(
 		nfsAddAndLink(rom, fatOffset, dir.dirs[i], p / dir.dirs[i].dirName, romOffset, padding);
 }
 
-static u8 toU8(u32 val, const std::string& name)
-{
-	if (val < 0x100)
-		return static_cast<u8>(val);
-
-	throw std::invalid_argument('\'' + name + "' must be a hex value from 0 to ff");
-}
-
-struct Config
-{
-	static constexpr u32 keep = ~0u;
-	static constexpr s16 noPadding = -1;
-
-	fs::path outputPath;
-	u8 ovtReplFlag = 0xff;
-	s16 padding = noPadding;
-	u32 arm9Entry = keep;
-	u32 arm9Load  = keep;
-	u32 arm7Entry = keep;
-	u32 arm7Load  = keep;
-
-	Config(const fs::path& path):
-		outputPath(path)
-	{
-		const fs::path configPath = ".neondst";
-
-		if (!fs::is_regular_file(configPath))
-			return;
-
-		std::ifstream configFile(configPath);
-
-		if (!configFile.is_open())
-			throw std::runtime_error("failed to open file " + configPath.native());
-
-		while (configFile.good())
-		{
-			std::string line, first;
-			std::stringstream s;
-			std::getline(configFile, line);
-
-			if (line.empty()) continue;
-
-			s << line;
-			s >> first;
-
-			if (first.starts_with('#')) continue;
-
-			auto sv = s.view();
-			sv.remove_prefix(first.size());
-
-			auto it = std::ranges::find_if_not(sv, static_cast<int(&)(int)>(std::isspace));
-			sv.remove_prefix(std::distance(sv.begin(), it));
-
-			if (first == "output")
-			{
-				if (path.empty())
-					outputPath = sv;
-
-				continue;
-			}
-
-			u32 val;
-			try
-			{
-				val = std::stoul(std::string(sv), nullptr, 16);
-			}
-			catch (const std::exception& e)
-			{
-				throw std::runtime_error("invalid value for '" + first + "'");
-			}
-
-			if (first == "ovt_repl_flag") ovtReplFlag = toU8(val, first);
-			else if (first == "pad") padding = toU8(val, first);
-			else if (first == "arm9_entry") arm9Entry = val;
-			else if (first == "arm9_load" ) arm9Load  = val;
-			else if (first == "arm7_entry") arm7Entry = val;
-			else if (first == "arm7_load" ) arm7Load  = val;
-			else throw std::invalid_argument("invalid configuration variable: " + first);
-		}
-	}
-
-	void print() const
-	{
-		std::cout << "Building ROM with the following configuration:\n";
-		std::cout << std::hex;
-
-		auto f = [](const char* s, auto val)
-		{
-			std::cout << '\t' << s;
-
-			if (val == keep)
-				std::cout << "keep\n";
-			else
-			{
-				std::cout << std::setw(2*sizeof(val)) << std::setfill('0');
-				std::cout << static_cast<u32>(val) << '\n';
-			}
-		};
-
-		f("arm9_entry: ", arm9Entry);
-		f("arm9_load:  ", arm9Load);
-		f("arm7_entry: ", arm7Entry);
-		f("arm7_load:  ", arm7Load);
-		f("ovt_repl_flag: ", ovtReplFlag);
-
-		std::cout << std::dec;
-	}
-};
-
 void pack(const fs::path& outputPath)
 {
 	Config config(outputPath);
+
+	std::cout << "Building ROM with the following configuration:\n";
 	config.print();
 
-	if (config.outputPath.empty())
+	if (config.romPath.empty())
 		throw std::invalid_argument("no output file given");
 
 	NDSDirectory rootDir;
@@ -905,12 +797,12 @@ void pack(const fs::path& outputPath)
 	rom[0x15e] = crc & 0xff;
 	rom[0x15f] = crc >> 8;
 
-	std::cout << "Writing " << config.outputPath << '\n';
+	std::cout << "Writing " << config.romPath << '\n';
 
-	std::ofstream outputStream(config.outputPath, std::ios::binary | std::ios::out);
+	std::ofstream outputStream(config.romPath, std::ios::binary | std::ios::out);
 	
 	if (!outputStream.is_open())
-		throw std::runtime_error("failed to create file " + config.outputPath.native());
+		throw std::runtime_error("failed to create file " + config.romPath.native());
 
 	outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
 
@@ -925,5 +817,5 @@ void pack(const fs::path& outputPath)
 
 	outputStream.close();
 
-	std::cout << "Successfully written NDS image " << config.outputPath << '\n';
+	std::cout << "Successfully written NDS image " << config.romPath << '\n';
 }

@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <filesystem>
 
 #define WARNING "\x1B[1;95mwarning: \033[0m"
 #define ERROR   "\x1B[1;91merror: \033[0m"
@@ -14,6 +15,16 @@ using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 
+namespace fs = std::filesystem;
+
+struct Extractor
+{
+	void extract(const fs::path& ndsInputPath);
+
+	virtual void writeFile(const fs::path& shortPath, const void* data, std::size_t size) = 0;
+	virtual void writeDir (const fs::path& shortPath) = 0;
+};
+
 struct NDSDirectory
 {
 	u16 firstFileID;
@@ -22,6 +33,8 @@ struct NDSDirectory
 	std::vector<std::string> files;
 	std::vector<NDSDirectory> dirs;
 };
+
+NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize);
 
 constexpr std::size_t oneGB = 1ull << 30;
 

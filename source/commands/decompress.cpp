@@ -7,8 +7,6 @@
 #include <fstream>
 #include <array>
 
-namespace fs = std::filesystem;
-
 static const fs::path rawPath = fs::path{"clean"} / "raw";
 static const fs::path decompressedPath = fs::path{"clean"} / "decompressed";
 static const fs::path arm9Path = rawPath / "arm9.bin";
