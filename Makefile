@@ -5,11 +5,15 @@ INCLUDES := $(SOURCES)
 INCLUDE  := $(foreach dir,$(INCLUDES),-I$(dir))
 CXX      := g++
 CXXFLAGS := $(INCLUDE) -std=c++23 -Wall -Wextra -O3
-LDFLAGS  := -static-libgcc -static-libstdc++
+LDFLAGS  := -static -static-libgcc -static-libstdc++
 BINDIR   ?= /usr/local/bin
 
 CPPFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 OFILES   := $(foreach file,$(CPPFILES:.cpp=.o),$(BUILD)/$(file))
+
+ifdef WINDOWS
+	CXX := x86_64-w64-mingw32-g++
+endif
 
 .SUFFIXES:
 .SECONDEXPANSION:
@@ -28,7 +32,7 @@ $(BUILD):
 
 clean:
 	@echo clean...
-	@rm -fr $(BUILD) $(OUTPUT)
+	@rm -fr $(BUILD) $(OUTPUT) $(OUTPUT).exe
 
 install: $(OUTPUT)
 	@echo installing $(OUTPUT) to $(BINDIR)

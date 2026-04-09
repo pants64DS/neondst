@@ -10,12 +10,12 @@ struct InitExtractor : Extractor
 		const fs::path path = cleanRawPath / shortPath;
 
 		if (fs::exists(path))
-			throw std::runtime_error("file " + path.native() + " already exists");
+			throw std::runtime_error("file " + path.string() + " already exists");
 
 		std::ofstream outFile(path, std::ios::binary | std::ios::out);
 
 		if (!outFile.is_open())
-			throw std::runtime_error("failed to create file " + path.native());
+			throw std::runtime_error("failed to create file " + path.string());
 
 		outFile.write(static_cast<const char*>(data), size);
 	}
@@ -25,7 +25,7 @@ struct InitExtractor : Extractor
 		const fs::path path = cleanRawPath / shortPath;
 
 		if (fs::is_directory(path))
-			throw "directory " + path.native() + " already exists";
+			throw std::runtime_error("directory " + path.string() + " already exists");
 
 		fs::create_directory(path);
 	}

@@ -22,7 +22,7 @@ Config::Config(const fs::path& path):
 	std::ifstream configFile(configPath);
 
 	if (!configFile.is_open())
-		throw std::runtime_error("failed to open file " + configPath.native());
+		throw std::runtime_error("failed to open file " + configPath.string());
 
 	while (configFile.good())
 	{

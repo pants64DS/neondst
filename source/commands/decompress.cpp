@@ -32,7 +32,7 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 		std::ifstream inputFile(inputPath, std::ios::in | std::ios::binary);
 
 		if (!inputFile.is_open())
-			throw std::runtime_error("failed to open file " + inputPath.native());
+			throw std::runtime_error("failed to open file " + inputPath.string());
 
 		auto compressedSize = fs::file_size(inputPath);
 		std::vector<u8> buffer;
@@ -40,7 +40,7 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 		buffer.resize(compressedSize);
 
 		if (!inputFile.read(reinterpret_cast<char*>(buffer.data()), compressedSize))
-			throw std::runtime_error("failed to read file " + inputPath.native());
+			throw std::runtime_error("failed to read file " + inputPath.string());
 
 		if (isArm9Bin)
 		{
@@ -64,10 +64,10 @@ void Commands::decompress(std::span<const fs::path> relativePaths)
 		std::ofstream outputFile(outputPath, std::ios::binary | std::ios::out);
 
 		if (!outputFile.is_open())
-			throw std::runtime_error("failed to create file " + outputPath.native());
+			throw std::runtime_error("failed to create file " + outputPath.string());
 
 		if (!outputFile.write(reinterpret_cast<const char*>(buffer.data()), buffer.size()))
-			throw std::runtime_error("failed to write file " + outputPath.native());
+			throw std::runtime_error("failed to write file " + outputPath.string());
 	}
 
 	std::cout << "Done\n";

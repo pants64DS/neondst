@@ -19,7 +19,7 @@ static void checkFileSize(const fs::path& path, std::size_t size, std::size_t ma
 	if (size > maxSize)
 	{
 		std::stringstream s;
-		s << "the size of " << path.native() << " exceeds " << maxSize << " bytes";
+		s << "the size of " << path.string() << " exceeds " << maxSize << " bytes";
 		throw std::length_error(s.view().data());
 	}
 }
@@ -132,7 +132,7 @@ static bool fntAddNewFiles(
 				continue;
 
 			throw std::runtime_error(
-				"new file " + p.native()
+				"new file " + p.string()
 				+ " is not in a new directory"
 			);
 		}
@@ -264,7 +264,7 @@ static void openInputFile(std::ifstream& fileStream, const fs::path& path)
 	fileStream.open(path, std::ios::binary | std::ios::in);
 
 	if (!fileStream.is_open())
-		throw std::runtime_error("failed to open file " + path.native());
+		throw std::runtime_error("failed to open file " + path.string());
 }
 
 static fs::path findInputFile(const fs::path& path)
@@ -272,7 +272,7 @@ static fs::path findInputFile(const fs::path& path)
 	const fs::path toBeCompressedPath = "modified" / ("to-be-compressed" / path);
 
 	if (fs::is_regular_file(toBeCompressedPath))
-		throw std::runtime_error("compression is only supported for overlay, not for " + path.native());
+		throw std::runtime_error("compression is only supported for overlay, not for " + path.string());
 
 	const fs::path modifiedFinalPath = "modified" / ("final" / path);
 
@@ -284,7 +284,7 @@ static fs::path findInputFile(const fs::path& path)
 	if (fs::is_regular_file(cleanRawPath))
 		return cleanRawPath;
 
-	throw std::runtime_error("could not find file: " + path.native());
+	throw std::runtime_error("could not find file: " + path.string());
 }
 
 static void writeOverlay(
@@ -327,7 +327,7 @@ static void writeOverlay(
 		std::ofstream compressedFile(finalPath, std::ios::binary | std::ios::out);
 
 		if (!compressedFile.is_open())
-			throw std::runtime_error("failed to open file " + finalPath.native());
+			throw std::runtime_error("failed to open file " + finalPath.string());
 
 		compressedFile.write(reinterpret_cast<const char*>(compressedData.data()), size);
 
@@ -351,7 +351,7 @@ static void writeOverlay(
 		const fs::path cleanPath = "clean" / ("raw" / path);
 
 		if (!fs::is_regular_file(cleanPath))
-			throw std::runtime_error("could not find overlay file: " + path.native());
+			throw std::runtime_error("could not find overlay file: " + path.string());
 
 		size = fs::file_size(cleanPath);
 		romCheckBounds(rom, romOffset + size, padding);
@@ -362,7 +362,7 @@ static void writeOverlay(
 	if (!clean)
 	{
 		if (size >= 1 << 24)
-			throw std::length_error("size of " + finalPath.native() + " exceeds 16 MB");
+			throw std::length_error("size of " + finalPath.string() + " exceeds 16 MB");
 
 		// Adjust the compressed size of the overlay in the overlay table
 		u8* p = rom.data() + ovtOffset + 0x20*ovID + 0x1c;
@@ -493,7 +493,7 @@ void pack(const fs::path& outputPath)
 	if (ovt9Size % 0x20)
 	{
 		throw std::length_error(
-			"invalid ARM9 overlay table: " + ovt9Path.native()
+			"invalid ARM9 overlay table: " + ovt9Path.string()
 			+ " (each entry must be 0x20 bytes)"
 		);
 	}
@@ -559,7 +559,7 @@ void pack(const fs::path& outputPath)
 	if (ovt7Size % 0x20)
 	{
 		throw std::length_error(
-			"invalid ARM7 overlay table: " + ovt7Path.native()
+			"invalid ARM7 overlay table: " + ovt7Path.string()
 			+ " (each entry must be 0x20 bytes)"
 		);
 	}
@@ -804,7 +804,7 @@ void pack(const fs::path& outputPath)
 	std::ofstream outputStream(config.romPath, std::ios::binary | std::ios::out);
 	
 	if (!outputStream.is_open())
-		throw std::runtime_error("failed to create file " + config.romPath.native());
+		throw std::runtime_error("failed to create file " + config.romPath.string());
 
 	outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
 

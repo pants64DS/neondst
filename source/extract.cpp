@@ -40,7 +40,7 @@ void Extractor::extract(const fs::path& ndsInputPath)
 	ndsFile.open(ndsInputPath, std::ios::in | std::ios::binary);
 
 	if (!ndsFile.good())
-		throw std::runtime_error("failed to open file " + ndsInputPath.native());
+		throw std::runtime_error("failed to open file " + ndsInputPath.string());
 
 	std::vector<u32> romU32;
 	romU32.resize((ndsFileSize + 3) >> 2);

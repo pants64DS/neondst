@@ -13,12 +13,12 @@ static bool fileEquals(const fs::path& path, const void* data, std::size_t size)
 	std::ifstream file(path, std::ios::in | std::ios::binary);
 
 	if (!file.is_open())
-		throw std::runtime_error("failed to open file " + path.native());
+		throw std::runtime_error("failed to open file " + path.string());
 
 	auto buffer = std::make_unique<char[]>(size);
 
 	if (!file.read(buffer.get(), size))
-		throw std::runtime_error("failed to read file " + path.native());
+		throw std::runtime_error("failed to read file " + path.string());
 
 	return std::memcmp(buffer.get(), data, size) == 0;
 }
@@ -39,7 +39,7 @@ struct ApplyExtractor : Extractor
 		std::ofstream outFile(modifiedFilePath, std::ios::binary | std::ios::out);
 
 		if (!outFile.is_open())
-			throw std::runtime_error("failed to create file " + modifiedFilePath.native());
+			throw std::runtime_error("failed to create file " + modifiedFilePath.string());
 
 		outFile.write(static_cast<const char*>(data), size);
 	}
