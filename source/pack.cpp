@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 #include <map>
 #include <cstring>
 
@@ -127,7 +128,8 @@ static bool fntAddNewFiles(
 	{
 		if (!fs::is_directory(p))
 		{
-			if (newDir) continue;
+			if (newDir || std::ranges::contains(ndsDir.files, p.filename().string()))
+				continue;
 
 			throw std::runtime_error(
 				"new file " + p.native()
