@@ -272,12 +272,17 @@ static fs::path findInputFile(const fs::path& path)
 	const fs::path toBeCompressedPath = "modified" / ("to-be-compressed" / path);
 
 	if (fs::is_regular_file(toBeCompressedPath))
-		throw std::runtime_error("compression is only supported for overlay, not for " + path.string());
+		throw std::runtime_error("compression is only supported for overlays, not for " + path.string());
 
 	const fs::path modifiedFinalPath = "modified" / ("final" / path);
 
 	if (fs::is_regular_file(modifiedFinalPath))
 		return modifiedFinalPath;
+
+	const fs::path modifiedBasePath = "modified" / ("base" / path);
+
+	if (fs::is_regular_file(modifiedBasePath))
+		return modifiedBasePath;
 
 	const fs::path cleanRawPath = "clean" / ("raw" / path);
 
@@ -343,6 +348,16 @@ static void writeOverlay(
 		size = fs::file_size(finalPath);
 		romCheckBounds(rom, romOffset + size, padding);
 		openInputFile(fileStream, finalPath);
+		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
+	}
+	else if (const fs::path basePath = "modified" / ("base" / path);
+		fs::is_regular_file(basePath))
+	{
+		std::cout << "Replacing overlay " << ovID << " with " << basePath << '\n';
+
+		size = fs::file_size(basePath);
+		romCheckBounds(rom, romOffset + size, padding);
+		openInputFile(fileStream, basePath);
 		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
 	}
 	else
@@ -654,7 +669,7 @@ void pack(const fs::path& outputPath)
 
 	u16 freeDirID = fntFindNextFreeDirID(rootDir);
 
-	if (const fs::path rootPath = fs::path("modified")/"final"/"root";
+	if (const fs::path rootPath = fs::path("modified") / "base" / "root";
 		fs::is_directory(rootPath)
 		&& fntAddNewFiles(rootDir, rootPath, freeFileID, freeDirID, false))
 	{

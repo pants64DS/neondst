@@ -28,19 +28,19 @@ static void dumpFntTree(
 		dumpFntTree(extractor, romU32, dir.dirs[i], p / dir.dirs[i].dirName, fatOffset);
 }
 
-void Extractor::extract(const fs::path& ndsInputPath)
+void Extractor::extract()
 {
-	const u32 ndsFileSize = fs::file_size(ndsInputPath);
+	const u32 ndsFileSize = fs::file_size(romPath);
 
 	if (ndsFileSize > oneGB)
 		throw std::length_error("the input file is larger than 1 GB");
 
 	std::ifstream ndsFile;
 	fs::path outputPath;
-	ndsFile.open(ndsInputPath, std::ios::in | std::ios::binary);
+	ndsFile.open(romPath, std::ios::in | std::ios::binary);
 
 	if (!ndsFile.good())
-		throw std::runtime_error("failed to open file " + ndsInputPath.string());
+		throw std::runtime_error("failed to open file " + romPath.string());
 
 	std::vector<u32> romU32;
 	romU32.resize((ndsFileSize + 3) >> 2);

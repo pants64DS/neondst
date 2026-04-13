@@ -19,7 +19,9 @@ namespace fs = std::filesystem;
 
 struct Extractor
 {
-	void extract(const fs::path& ndsInputPath);
+	fs::path romPath;
+	Extractor(const fs::path& romPath) : romPath(romPath) {}
+	void extract();
 
 	virtual void writeFile(const fs::path& shortPath, const void* data, std::size_t size) = 0;
 	virtual void writeDir (const fs::path& shortPath) = 0;

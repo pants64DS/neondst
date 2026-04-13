@@ -26,22 +26,100 @@ static bool fileEquals(const fs::path& path, const void* data, std::size_t size)
 struct ApplyExtractor : Extractor
 {
 	fs::path tempPath;
-	ApplyExtractor(const fs::path& path) : tempPath(path) {}
 
-	virtual void writeFile(const fs::path& shortPath, const void* data, std::size_t size) override
+	ApplyExtractor(const fs::path& romPath, const fs::path& tempPath):
+		Extractor(romPath),
+		tempPath(tempPath)
+	{}
+
+	virtual void writeFile(const fs::path& path, const void* data, std::size_t size) override
 	{
-		if (fileEquals("clean" / ("raw" / shortPath), data, size))
+		const fs::path toBeCompressedPath = "modified" / ("to-be-compressed" / path);
+		const fs::path finalPath          = "modified" / ("final" / path);
+
+		const bool toBeCompressedExists = fs::is_regular_file(toBeCompressedPath);
+		const bool finalExists          = fs::is_regular_file(finalPath);
+
+		const fs::path cleanRawPath = "clean" / ("raw" / path);
+		const fs::path cleanDecompressedPath = "clean" / ("decompressed" / path);
+
+		if (!toBeCompressedExists && !finalExists)
+		{
+			if (fileEquals(cleanRawPath, data, size) || fileEquals(cleanDecompressedPath, data, size))
+				return;
+
+			const fs::path tempFilePath = tempPath / path;
+			fs::create_directories(tempFilePath.parent_path());
+
+			std::ofstream outFile(tempFilePath, std::ios::binary | std::ios::out);
+
+			if (!outFile.is_open())
+				throw std::runtime_error("failed to create file " + tempFilePath.string());
+
+			outFile.write(static_cast<const char*>(data), size);
 			return;
+		}
 
-		const fs::path modifiedFilePath = tempPath / shortPath;
-		fs::create_directories(modifiedFilePath.parent_path());
+		const auto& lastBuiltPath = toBeCompressedExists ? toBeCompressedPath : finalPath;
+		std::ifstream lastBuiltFile(lastBuiltPath, std::ios::in | std::ios::binary);
 
-		std::ofstream outFile(modifiedFilePath, std::ios::binary | std::ios::out);
+		if (!lastBuiltFile.is_open())
+			throw std::runtime_error("failed to create file " + lastBuiltPath.string());
 
-		if (!outFile.is_open())
-			throw std::runtime_error("failed to create file " + modifiedFilePath.string());
+		std::vector<u8> lastBuiltFileData(fs::file_size(lastBuiltPath));
+		lastBuiltFile.read(reinterpret_cast<char*>(lastBuiltFileData.data()), lastBuiltFileData.size());
+		lastBuiltFile.close();
 
-		outFile.write(static_cast<const char*>(data), size);
+		if (lastBuiltFileData.size() != size || std::memcmp(data, lastBuiltFileData.data(), size) != 0)
+		{
+			const fs::path modifiedBasePath = "modified" / ("base" / path);
+
+			std::cout << WARNING << lastBuiltPath;
+			std::cout << " differs from the corresponding file in " << romPath;
+			std::cout << " but the changes will not be applied to " << modifiedBasePath;
+			std::cout << " (unimplemented)\n";
+		}
+
+		fs::copy_file("modified" / ("base" / path), tempPath / path);
+
+		/*
+		const fs::path* baseFilePath = nullptr;
+		bool compressed = false;
+
+		if (fs::is_regular_file(modifiedBasePath))
+			baseFilePath = &modifiedBasePath;
+		else if (fs::is_regular_file(cleanDecompressedPath))
+			baseFilePath = &cleanDecompressedPath;
+		else if (fs::is_regular_file(cleanRawPath))
+		{
+			throw std::runtime_error("not implemented (1)");
+			// check if compressed ...
+		}
+		else
+		{
+			throw std::runtime_error("not implemented (2)");
+		}
+
+		std::ifstream baseFile(*baseFilePath, std::ios::in | std::ios::binary);
+
+		if (!baseFile.is_open())
+			throw std::runtime_error("failed to open file " + baseFilePath->string());
+
+		std::vector<u8> baseFileData(fs::file_size(*baseFilePath));
+		baseFile.read(reinterpret_cast<char*>(baseFileData.data()), baseFileData.size());
+
+		if (compressed)
+		{
+			throw std::runtime_error("not implemented (3)");
+		}
+		*/
+
+		/*
+		TODO:
+			- compare data with lastBuiltFileData
+			- apply differences to baseFileData
+			- store the result in tempPath / path
+		*/
 	}
 
 	virtual void writeDir(const fs::path&) override {}
@@ -57,7 +135,7 @@ void Commands::apply(const fs::path& romPath)
 
 	try
 	{
-		ApplyExtractor{tempPath}.extract(config.romPath);
+		ApplyExtractor{config.romPath, tempPath}.extract();
 	}
 	catch (const std::exception& ex)
 	{

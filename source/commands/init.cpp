@@ -5,6 +5,8 @@ static const fs::path cleanRawPath = fs::path("clean") / "raw";
 
 struct InitExtractor : Extractor
 {
+	using Extractor::Extractor;
+
 	virtual void writeFile(const fs::path& shortPath, const void* data, std::size_t size) override
 	{
 		const fs::path path = cleanRawPath / shortPath;
@@ -38,7 +40,7 @@ void Commands::init(const fs::path& cleanRomPath)
 	fs::remove_all(clean);
 	fs::create_directory(clean);
 
-	InitExtractor{}.extract(cleanRomPath);
+	InitExtractor(cleanRomPath).extract();
 
 	fs::create_directory(clean / "decompressed");
 
