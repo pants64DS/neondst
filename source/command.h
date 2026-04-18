@@ -43,21 +43,18 @@ struct Command
 	std::uintptr_t funcAddr;
 	void(&funcWrapper)(std::uintptr_t funcAddr, int argc, char** argv);
 	const char* name;
-	const char* subName;
 	int minArgs, maxArgs;
 	const char* usage;
 
 	template<class... Args> Command(
 		void (&func)(Args...),
 		const char* name,
-		const char* subName,
 		const char* usage,
 		uint32_t numRequiredArgs = 0
 	):
 		funcAddr(reinterpret_cast<std::uintptr_t>(&func)),
 		funcWrapper(commandFuncWrapper<Args...>),
 		name(name),
-		subName(subName),
 		minArgs(numRequiredArgs),
 		maxArgs(sizeof...(Args)),
 		usage(usage)
@@ -66,14 +63,12 @@ struct Command
 	template<class Arg> Command(
 		void (&func)(std::span<Arg>),
 		const char* name,
-		const char* subName,
 		const char* usage,
 		uint32_t numRequiredArgs = 0
 	):
 		funcAddr(reinterpret_cast<std::uintptr_t>(&func)),
 		funcWrapper(commandFuncWrapper2<Arg>),
 		name(name),
-		subName(subName),
 		minArgs(numRequiredArgs),
 		maxArgs(std::numeric_limits<int>::max()),
 		usage(usage)
@@ -88,24 +83,22 @@ struct Command
 namespace Commands
 {
 	void init(const fs::path& cleanRomPath);
-	void decompress(std::span<const fs::path> relativePaths);
 	void build(const fs::path& outputPath);
 	void apply(const fs::path& romPath);
-	void diff_save();
-	void diff_apply();
+	void status(const fs::path& romPath);
+	void decompress(std::span<const fs::path> relativePaths);
 	void help(std::string_view command = "");
 	void version();
 }
 
 inline const Command commands[] = {
-	{Commands::init,       "init",       nullptr, "<clean ROM>", 1},
-	{Commands::decompress, "decompress", nullptr, "<files...>", 1},
-	{Commands::build,      "build",      nullptr, "[<output ROM>]"},
-	{Commands::apply,      "apply",      nullptr, "[<input ROM>]"},
-	{Commands::diff_save,  "diff",       "save",  ""},
-	{Commands::diff_apply, "diff",       "apply", ""},
-	{Commands::help,       "help",       nullptr, "[<command>]"},
-	{Commands::version,    "version",    nullptr, ""}
+	{Commands::init,       "init",       "<clean ROM>", 1},
+	{Commands::build,      "build",      "[<output ROM>]"},
+	{Commands::apply,      "apply",      "[<input ROM>]"},
+	{Commands::status,     "status",     "[<ROM>]"},
+	{Commands::decompress, "decompress", "<files...>", 1},
+	{Commands::help,       "help",       "[<command>]"},
+	{Commands::version,    "version",    ""}
 };
 
 int runCommand(std::string_view commandName, int argc, char** argv);

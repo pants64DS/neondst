@@ -36,6 +36,9 @@ struct NDSDirectory
 	std::vector<NDSDirectory> dirs;
 };
 
+bool fileEquals(const fs::path& path, const void* data, std::size_t size);
+bool fileExistsAndEquals(const fs::path& path, const void* data, std::size_t size);
+
 NDSDirectory buildFntTree(u8* fnt, u32 dirID, u32 fntSize);
 
 constexpr std::size_t oneGB = 1ull << 30;

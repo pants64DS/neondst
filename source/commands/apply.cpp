@@ -5,9 +5,13 @@
 #include <fstream>
 #include <cstring>
 
-static bool fileEquals(const fs::path& path, const void* data, std::size_t size)
+bool fileExistsAndEquals(const fs::path& path, const void* data, std::size_t size)
 {
-	if (!fs::is_regular_file(path)) return false;
+	return fs::is_regular_file(path) && fileEquals(path, data, size);
+}
+
+bool fileEquals(const fs::path& path, const void* data, std::size_t size)
+{
 	if (fs::file_size(path) != size) return false;
 
 	std::ifstream file(path, std::ios::in | std::ios::binary);
@@ -45,7 +49,7 @@ struct ApplyExtractor : Extractor
 
 		if (!toBeCompressedExists && !finalExists)
 		{
-			if (fileEquals(cleanRawPath, data, size) || fileEquals(cleanDecompressedPath, data, size))
+			if (fileExistsAndEquals(cleanRawPath, data, size) || fileExistsAndEquals(cleanDecompressedPath, data, size))
 				return;
 
 			const fs::path tempFilePath = tempPath / path;
@@ -64,7 +68,7 @@ struct ApplyExtractor : Extractor
 		std::ifstream lastBuiltFile(lastBuiltPath, std::ios::in | std::ios::binary);
 
 		if (!lastBuiltFile.is_open())
-			throw std::runtime_error("failed to create file " + lastBuiltPath.string());
+			throw std::runtime_error("failed to open file " + lastBuiltPath.string());
 
 		std::vector<u8> lastBuiltFileData(fs::file_size(lastBuiltPath));
 		lastBuiltFile.read(reinterpret_cast<char*>(lastBuiltFileData.data()), lastBuiltFileData.size());
@@ -80,7 +84,14 @@ struct ApplyExtractor : Extractor
 			std::cout << " (unimplemented)\n";
 		}
 
-		fs::copy_file("modified" / ("base" / path), tempPath / path);
+		const fs::path baseFilePath = "modified" / ("base" / path);
+
+		if (fs::is_regular_file(baseFilePath))
+		{
+			const fs::path tempFilePath = tempPath / path;
+			fs::create_directories(tempFilePath.parent_path());
+			fs::copy_file(baseFilePath, tempFilePath);
+		}
 
 		/*
 		const fs::path* baseFilePath = nullptr;
@@ -130,7 +141,7 @@ void Commands::apply(const fs::path& romPath)
 	Config config(romPath);
 
 	fs::path tempPath = fs::path("modified") / "temp-";
-	tempPath += romPath.stem();
+	tempPath += config.romPath.stem();
 	fs::remove_all(tempPath);
 
 	try
@@ -140,11 +151,11 @@ void Commands::apply(const fs::path& romPath)
 	catch (const std::exception& ex)
 	{
 		fs::remove_all(tempPath);
-		throw ex;
+		throw;
 	}
 
-	const fs::path modifiedFinalPath = fs::path("modified") / "final";
-	fs::remove_all(modifiedFinalPath);
-	fs::rename(tempPath, modifiedFinalPath);
+	const fs::path modifiedBasePath = fs::path("modified") / "base";
+	fs::remove_all(modifiedBasePath);
+	fs::rename(tempPath, modifiedBasePath);
 	fs::remove_all(fs::path("modified") / "to-be-comressed");
 }

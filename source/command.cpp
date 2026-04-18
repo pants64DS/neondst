@@ -34,11 +34,7 @@ int Command::run(int argc, char** argv) const
 
 void Command::printUsage() const
 {
-	std::cout << "neondst " << name;
-
-	if (subName) std::cout << ' ' << subName;
-
-	std::cout << ' ' << usage << '\n';
+	std::cout << "neondst " << name << ' ' << usage << '\n';
 }
 
 void Command::printError(const char* error) const
@@ -50,32 +46,12 @@ void Command::printError(const char* error) const
 
 int runCommand(std::string_view commandName, int argc, char** argv)
 {
-	const char* foundName = nullptr;
-
 	for (const Command& command : commands)
-	{
 		if (command.name == commandName)
-		{
-			if (!command.subName)
-				return command.run(argc, argv);
+			return command.run(argc, argv);
 
-			if (argv[0] && std::string_view{argv[0]} == command.subName)
-				return command.run(argc - 1, argv + 1);
-
-			foundName = command.name;
-		}
-	}
-
-	if (foundName)
-	{
-		std::cout << ERROR "invalid subcommand\n";
-		Commands::help(foundName);
-	}
-	else
-	{
-		std::cout << ERROR "'" << commandName << "' is not a neondst command\n";
-		Commands::help();
-	}
+	std::cout << ERROR "'" << commandName << "' is not a neondst command\n";
+	Commands::help();
 
 	return 1;
 }

@@ -456,14 +456,16 @@ void pack(const fs::path& outputPath)
 	u32 ovt9Offset, ovt7Offset, arm9Offset, arm7Offset, fntOffset, iconOffset, fatOffset;
 	u32 romHeaderSize, fntSize, ovt7Size, ovt9Size, fatSize, arm7Size, arm9Size, romOffset, iconSize, rsaSize;
 
-	fs::path romHeaderPath = findInputFile("header.bin");
-	fs::path fntPath       = findInputFile("fnt.bin");
-	fs::path ovt7Path      = findInputFile("arm7ovt.bin");
-	fs::path ovt9Path      = findInputFile("arm9ovt.bin");
-	fs::path arm7Path      = findInputFile("arm7.bin");
-	fs::path arm9Path      = findInputFile("arm9.bin");
-	fs::path iconPath      = findInputFile("banner.bin");
-	fs::path rsaPath       = findInputFile("rsasig.bin");
+	const fs::path romHeaderPath = findInputFile("header.bin");
+	const fs::path fntPath       = findInputFile("fnt.bin");
+	const fs::path ovt7Path      = findInputFile("arm7ovt.bin");
+	const fs::path ovt9Path      = findInputFile("arm9ovt.bin");
+	const fs::path arm7Path      = findInputFile("arm7.bin");
+	const fs::path arm9Path      = findInputFile("arm9.bin");
+	const fs::path iconPath      = findInputFile("banner.bin");
+	const fs::path rsaPath       = findInputFile("rsasig.bin");
+
+	const fs::path modifiedFinalPath = fs::path("modified") / "final";
 
 	std::cout << "Reading ROM header\n";
 
@@ -651,6 +653,17 @@ void pack(const fs::path& outputPath)
 		}
 	}
 
+	const fs::path finalOvt9Path = modifiedFinalPath / "arm9ovt.bin";
+	std::cout << "Writing " << finalOvt9Path << '\n';
+
+	std::ofstream ovt9File(finalOvt9Path, std::ios::binary | std::ios::out);
+
+	if (!ovt9File.is_open())
+		throw std::runtime_error("failed to create file " + finalOvt9Path.string());
+
+	ovt9File.write(reinterpret_cast<const char*>(rom.data() + ovt9Offset), ovt9Size);
+	ovt9File.close();
+
 	for (u32 i = 0; i < ovt7Size / 32; i++)
 	{
 		if (rom[ovt7Offset + i * 32 + 31] == config.ovtReplFlag)
@@ -666,6 +679,17 @@ void pack(const fs::path& outputPath)
 			freeFileID++;
 		}
 	}
+
+	const fs::path finalOvt7Path = modifiedFinalPath / "arm7ovt.bin";
+	std::cout << "Writing " << finalOvt7Path << '\n';
+
+	std::ofstream ovt7File(finalOvt7Path, std::ios::binary | std::ios::out);
+
+	if (!ovt7File.is_open())
+		throw std::runtime_error("failed to create file " + finalOvt7Path.string());
+
+	ovt7File.write(reinterpret_cast<const char*>(rom.data() + ovt7Offset), ovt7Size);
+	ovt7File.close();
 
 	u16 freeDirID = fntFindNextFreeDirID(rootDir);
 
@@ -762,6 +786,17 @@ void pack(const fs::path& outputPath)
 
 	nfsAddAndLink(rom, fatOffset, rootDir, "root", romOffset, config.padding);
 
+	const fs::path finalFatPath = modifiedFinalPath / "fat.bin";
+	std::cout << "Writing " << finalFatPath << '\n';
+
+	std::ofstream fatFile(finalFatPath, std::ios::binary | std::ios::out);
+
+	if (!fatFile.is_open())
+		throw std::runtime_error("failed to create file " + finalFatPath.string());
+
+	fatFile.write(reinterpret_cast<const char*>(rom.data() + fatOffset), fatSize);
+	fatFile.close();
+
 	std::cout << "Adding RSA signature " << rsaPath << '\n';
 
 	rsaSize = fs::file_size(rsaPath);
@@ -814,25 +849,35 @@ void pack(const fs::path& outputPath)
 	rom[0x15e] = crc & 0xff;
 	rom[0x15f] = crc >> 8;
 
+	const fs::path finalRomHeaderPath = modifiedFinalPath / "header.bin";
+	std::cout << "Writing " << finalRomHeaderPath << '\n';
+
+	std::ofstream headerFile(finalRomHeaderPath, std::ios::binary | std::ios::out);
+
+	if (!headerFile.is_open())
+		throw std::runtime_error("failed to create file " + finalRomHeaderPath.string());
+
+	headerFile.write(reinterpret_cast<const char*>(rom.data()), romHeaderSize);
+	headerFile.close();
+
 	std::cout << "Writing " << config.romPath << '\n';
 
-	std::ofstream outputStream(config.romPath, std::ios::binary | std::ios::out);
+	std::ofstream romFile(config.romPath, std::ios::binary | std::ios::out);
 	
-	if (!outputStream.is_open())
+	if (!romFile.is_open())
 		throw std::runtime_error("failed to create file " + config.romPath.string());
 
-	outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+	romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size());
 
 	if (config.padding != Config::noPadding)
 	{
 		const auto size = (0x20000 << rom[20]) - rom.size();
 		rom.clear();
 		rom.resize(size, config.padding);
-
-		outputStream.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+		romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size());
 	}
 
-	outputStream.close();
+	romFile.close();
 
 	std::cout << "Successfully written NDS image " << config.romPath << '\n';
 }
