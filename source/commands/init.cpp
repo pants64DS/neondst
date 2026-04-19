@@ -19,7 +19,8 @@ struct InitExtractor : Extractor
 		if (!outFile.is_open())
 			throw std::runtime_error("failed to create file " + path.string());
 
-		outFile.write(static_cast<const char*>(data), size);
+		if (!outFile.write(static_cast<const char*>(data), size))
+			throw std::runtime_error("failed to write file " + path.string());
 	}
 
 	virtual void writeDir(const fs::path& shortPath) override

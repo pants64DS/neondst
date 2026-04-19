@@ -98,7 +98,7 @@ static u16 fntFindNextFreeFileID(const NDSDirectory& dir)
 static u16 fntFindNextFreeDirID(const NDSDirectory& dir)
 {
 	u16 dirFree = dir.directoryID + 1;
-	
+
 	for (u32 i = 0; i < dir.dirs.size(); i++)
 		dirFree = std::max(dirFree, fntFindNextFreeDirID(dir.dirs[i]));
 
@@ -150,7 +150,7 @@ static bool fntAddNewFiles(
 		dir.firstFileID = freeFileID;
 		dir.directoryID = freeDirID;
 		dir.dirName = p.filename().string();
-		
+
 		for (const fs::path& sp : fs::directory_iterator(p))
 		{
 			if (fs::is_regular_file(sp))
@@ -163,7 +163,7 @@ static bool fntAddNewFiles(
 
 		freeFileID += dir.files.size();
 		freeDirID++;
-		modified = true;	
+		modified = true;
 
 		fntAddNewFiles(dir, p, freeFileID, freeDirID, true);
 	}
@@ -259,12 +259,22 @@ static u32 alignAddress(u32 address, u32 align)
 	return ((address + align - 1) & ~(align - 1));
 }
 
-static void openInputFile(std::ifstream& fileStream, const fs::path& path)
+static std::ifstream openInputFile(const fs::path& path)
 {
-	fileStream.open(path, std::ios::binary | std::ios::in);
+	std::ifstream fileStream(path, std::ios::binary | std::ios::in);
 
 	if (!fileStream.is_open())
 		throw std::runtime_error("failed to open file " + path.string());
+
+	return fileStream;
+}
+
+static void readInputFile(const fs::path& path, void* dest, std::size_t size)
+{
+	std::ifstream fs = openInputFile(path);
+
+	if (!fs.read(reinterpret_cast<char*>(dest), size))
+		throw std::runtime_error("failed to read file " + path.string());
 }
 
 static fs::path findInputFile(const fs::path& path)
@@ -310,7 +320,6 @@ static void writeOverlay(
 	const bool finalExists          = fs::is_regular_file(finalPath);
 
 	u32 size;
-	std::ifstream fileStream;
 	bool clean = false;
 
 	if (toBeCompressedExists
@@ -319,8 +328,7 @@ static void writeOverlay(
 		const u32 uncompressedSize = fs::file_size(toBeCompressedPath);
 		std::vector<u8> uncompressedData(uncompressedSize);
 
-		openInputFile(fileStream, toBeCompressedPath);
-		fileStream.read(reinterpret_cast<char*>(uncompressedData.data()), uncompressedSize);
+		readInputFile(toBeCompressedPath, uncompressedData.data(), uncompressedSize);
 
 		std::cout << "Compressing " << toBeCompressedPath << " -> " << finalPath << "\n" WARNING;
 		std::cout << "the compression feature is experimental; it may produce incorrect results\n";
@@ -334,7 +342,8 @@ static void writeOverlay(
 		if (!compressedFile.is_open())
 			throw std::runtime_error("failed to open file " + finalPath.string());
 
-		compressedFile.write(reinterpret_cast<const char*>(compressedData.data()), size);
+		if (!compressedFile.write(reinterpret_cast<const char*>(compressedData.data()), size))
+			throw std::runtime_error("failed to write file " + finalPath.string());
 
 		std::cout << "Replacing overlay " << ovID << " with " << finalPath << '\n';
 
@@ -347,8 +356,7 @@ static void writeOverlay(
 
 		size = fs::file_size(finalPath);
 		romCheckBounds(rom, romOffset + size, padding);
-		openInputFile(fileStream, finalPath);
-		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
+		readInputFile(finalPath, &rom[romOffset], size);
 	}
 	else if (const fs::path basePath = "modified" / ("base" / path);
 		fs::is_regular_file(basePath))
@@ -357,8 +365,7 @@ static void writeOverlay(
 
 		size = fs::file_size(basePath);
 		romCheckBounds(rom, romOffset + size, padding);
-		openInputFile(fileStream, basePath);
-		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
+		readInputFile(basePath, &rom[romOffset], size);
 	}
 	else
 	{
@@ -370,8 +377,7 @@ static void writeOverlay(
 
 		size = fs::file_size(cleanPath);
 		romCheckBounds(rom, romOffset + size, padding);
-		openInputFile(fileStream, cleanPath);
-		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), size);
+		readInputFile(cleanPath, &rom[romOffset], size);
 	}
 
 	if (!clean)
@@ -415,12 +421,8 @@ static void nfsAddAndLink(
 			continue;
 		}
 
-		std::ifstream fileStream;
-		openInputFile(fileStream, filePath);
-
 		romCheckBounds(rom, romOffset + fileSize, padding);
-		fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fileSize);
-		fileStream.close();
+		readInputFile(filePath, &rom[romOffset], fileSize);
 
 		u8* ptr = rom.data() + fatOffset + dirFileID*8;
 		writeU32(ptr, romOffset);
@@ -447,14 +449,11 @@ void pack(const fs::path& outputPath)
 
 	NDSDirectory rootDir;
 
-	std::ifstream fileStream;
 	std::map<u32, OverlayEntry> ov7Entries;
 	std::map<u32, OverlayEntry> ov9Entries;
 
 	u16 freeOvFileID = 0;
 	u16 freeFileID = 0;
-	u32 ovt9Offset, ovt7Offset, arm9Offset, arm7Offset, fntOffset, iconOffset, fatOffset;
-	u32 romHeaderSize, fntSize, ovt7Size, ovt9Size, fatSize, arm7Size, arm9Size, romOffset, iconSize, rsaSize;
 
 	const fs::path romHeaderPath = findInputFile("header.bin");
 	const fs::path fntPath       = findInputFile("fnt.bin");
@@ -469,42 +468,36 @@ void pack(const fs::path& outputPath)
 
 	std::cout << "Reading ROM header\n";
 
-	romHeaderSize = fs::file_size(romHeaderPath);
+	u32 romHeaderSize = fs::file_size(romHeaderPath);
 
 	if (romHeaderSize != 0x200 && romHeaderSize != 0x4000)
 		throw std::length_error("invalid size of ROM header: must be 0x200 or 0x4000");
 
-	openInputFile(fileStream, romHeaderPath);
-
 	std::vector<u8> rom(0x4000);
-	fileStream.read(reinterpret_cast<char*>(rom.data()), romHeaderSize);
-	fileStream.close();
+	readInputFile(romHeaderPath, rom.data(), romHeaderSize);
 
 	rom.reserve(readU32(rom.data() + 0x80)*3 >> 1);
 
 	if (romHeaderSize == 0x200)
 		std::fill(rom.data() + 0x200, rom.data() + 0x4000, 0);
 
-	romOffset = 0;
-	romOffset += 0x4000;
+	u32 romOffset = 0x4000;
 
 	std::cout << "Adding ARM9 binary " << arm9Path << '\n';
 
-	arm9Size = fs::file_size(arm9Path);
+	u32 arm9Size = fs::file_size(arm9Path);
 	checkFileSize(arm9Path, arm9Size, 0x3bfe00);
 
-	openInputFile(fileStream, arm9Path);
 	romCheckBounds(rom, romOffset + arm9Size, config.padding);
-	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), arm9Size);
-	fileStream.close();
+	readInputFile(arm9Path, &rom[romOffset], arm9Size);
 
-	arm9Offset = romOffset;
+	u32 arm9Offset = romOffset;
 	romOffset += arm9Size;
 	romOffset = std::max(0x8000U, romOffset);
 
 	std::cout << "Adding ARM9 overlay table " << ovt9Path << '\n';
 
-	ovt9Size = fs::file_size(ovt9Path);
+	u32 ovt9Size = fs::file_size(ovt9Path);
 	checkFileSize(ovt9Path, ovt9Size, oneGB);
 
 	if (ovt9Size % 0x20)
@@ -521,14 +514,12 @@ void pack(const fs::path& outputPath)
 		romOffset = alignAddress(romOffset, 4);
 
 	romCheckBounds(rom, romOffset + 4, config.padding);
-	ovt9Offset = romOffset;
+	u32 ovt9Offset = romOffset;
 
 	if (ovt9Size)
 	{
-		openInputFile(fileStream, ovt9Path);
 		romCheckBounds(rom, romOffset + ovt9Size, config.padding);
-		fileStream.read(reinterpret_cast<char*>(&rom[ovt9Offset]), ovt9Size);
-		fileStream.close();
+		readInputFile(ovt9Path, &rom[ovt9Offset], ovt9Size);
 
 		for (u32 i = 0; i < ovt9Size / 32; i++)
 		{
@@ -540,7 +531,7 @@ void pack(const fs::path& outputPath)
 				freeOvFileID = std::max(freeOvFileID + 0, fid + 1);
 				e.fileID = fid;
 			}
-			
+
 			ov9Entries[readU32(&rom[ovt9Offset + i * 32])] = e;
 		}
 	}
@@ -556,21 +547,19 @@ void pack(const fs::path& outputPath)
 
 	std::cout << "Adding ARM7 binary " << arm7Path << '\n';
 
-	arm7Size = fs::file_size(arm7Path);
+	u32 arm7Size = fs::file_size(arm7Path);
 	checkFileSize(arm7Path, arm7Size, 0x3bfe00);
 
-	openInputFile(fileStream, arm7Path);
 	romCheckBounds(rom, romOffset + arm7Size, config.padding);
-	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), arm7Size);
-	fileStream.close();
+	readInputFile(arm7Path, &rom[romOffset], arm7Size);
 
-	arm7Offset = romOffset;
+	u32 arm7Offset = romOffset;
 	romOffset += arm7Size;
 	romOffset = alignAddress(romOffset, 4);
 
 	std::cout << "Adding ARM7 overlay table " << ovt7Path << '\n';
 
-	ovt7Size = fs::file_size(ovt7Path);
+	u32 ovt7Size = fs::file_size(ovt7Path);
 	checkFileSize(ovt7Path, ovt7Size, oneGB);
 
 	if (ovt7Size % 0x20)
@@ -587,14 +576,12 @@ void pack(const fs::path& outputPath)
 		romOffset = alignAddress(romOffset, 4);
 
 	romCheckBounds(rom, romOffset + 4, config.padding);
-	ovt7Offset = romOffset;
+	u32 ovt7Offset = romOffset;
 
 	if (ovt7Size)
 	{
-		openInputFile(fileStream, ovt7Path);
 		romCheckBounds(rom, romOffset + ovt7Size, config.padding);
-		fileStream.read(reinterpret_cast<char*>(&rom[ovt7Offset]), ovt7Size);
-		fileStream.close();
+		readInputFile(ovt7Path, &rom[ovt7Offset], ovt7Size);
 
 		for (u32 i = 0; i < ovt7Size / 32; i++)
 		{
@@ -622,13 +609,11 @@ void pack(const fs::path& outputPath)
 
 	std::cout << "Reading FNT " << fntPath << '\n';
 
-	fntSize = fs::file_size(fntPath);
+	u32 fntSize = fs::file_size(fntPath);
 	checkFileSize(fntPath, fntSize, oneGB);
 
-	openInputFile(fileStream, fntPath);
 	romCheckBounds(rom, romOffset + fntSize, config.padding);
-	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), fntSize);
-	fileStream.close();
+	readInputFile(fntPath, &rom[romOffset], fntSize);
 
 	std::cout << "Extracting FNT directory tree\n";
 
@@ -661,7 +646,9 @@ void pack(const fs::path& outputPath)
 	if (!ovt9File.is_open())
 		throw std::runtime_error("failed to create file " + finalOvt9Path.string());
 
-	ovt9File.write(reinterpret_cast<const char*>(rom.data() + ovt9Offset), ovt9Size);
+	if (!ovt9File.write(reinterpret_cast<const char*>(rom.data() + ovt9Offset), ovt9Size))
+		throw std::runtime_error("failed to write file " + finalOvt9Path.string());
+
 	ovt9File.close();
 
 	for (u32 i = 0; i < ovt7Size / 32; i++)
@@ -688,7 +675,9 @@ void pack(const fs::path& outputPath)
 	if (!ovt7File.is_open())
 		throw std::runtime_error("failed to create file " + finalOvt7Path.string());
 
-	ovt7File.write(reinterpret_cast<const char*>(rom.data() + ovt7Offset), ovt7Size);
+	if (!ovt7File.write(reinterpret_cast<const char*>(rom.data() + ovt7Offset), ovt7Size))
+		throw std::runtime_error("failed to write file " + finalOvt7Path.string());
+
 	ovt7File.close();
 
 	u16 freeDirID = fntFindNextFreeDirID(rootDir);
@@ -704,16 +693,16 @@ void pack(const fs::path& outputPath)
 	else
 		std::cout << "Keeping the original FNT\n";
 
-	fntOffset = romOffset;
+	u32 fntOffset = romOffset;
 	romOffset += fntSize;
 	romOffset = alignAddress(romOffset, 4);
 
 	std::cout << "Allocating FAT\n";
 
-	fatSize = freeFileID * 8;
+	u32 fatSize = freeFileID * 8;
 	romCheckBounds(rom, romOffset + fatSize, config.padding);
 
-	fatOffset = romOffset;
+	u32 fatOffset = romOffset;
 	std::memset(&rom[fatOffset], 0x00, fatSize);
 
 	romOffset += fatSize;
@@ -741,12 +730,12 @@ void pack(const fs::path& outputPath)
 
 	std::cout << "Adding icon / title " << iconPath << '\n';
 
-	iconSize = fs::file_size(iconPath);
-
-	openInputFile(fileStream, iconPath);
+	u32 iconSize = fs::file_size(iconPath);
+	std::ifstream iconFile = openInputFile(iconPath);
 
 	u16 version;
-	fileStream.read(reinterpret_cast<char*>(&version), 2);
+	if (!iconFile.read(reinterpret_cast<char*>(&version), 2))
+		throw std::runtime_error("failed to read file " + iconPath.string());
 
 	switch (version)
 	{
@@ -771,14 +760,15 @@ void pack(const fs::path& outputPath)
 		break;
 	}
 
-	fileStream.seekg(-2, std::ios::cur);
-
+	iconFile.seekg(-2, std::ios::cur);
 	romCheckBounds(rom, romOffset + iconSize, config.padding);
-	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), iconSize);
-	fileStream.close();
 
-	iconOffset = romOffset;
+	if (!iconFile.read(reinterpret_cast<char*>(&rom[romOffset]), iconSize))
+		throw std::runtime_error("failed to read file " + iconPath.string());
 
+	iconFile.close();
+
+	u32 iconOffset = romOffset;
 	romOffset += iconSize;
 	romOffset = alignAddress(romOffset, 512);
 
@@ -794,13 +784,15 @@ void pack(const fs::path& outputPath)
 	if (!fatFile.is_open())
 		throw std::runtime_error("failed to create file " + finalFatPath.string());
 
-	fatFile.write(reinterpret_cast<const char*>(rom.data() + fatOffset), fatSize);
+	if (!fatFile.write(reinterpret_cast<const char*>(rom.data() + fatOffset), fatSize))
+		throw std::runtime_error("failed to write file " + finalFatPath.string());
+
 	fatFile.close();
 
 	std::cout << "Adding RSA signature " << rsaPath << '\n';
 
-	rsaSize = fs::file_size(rsaPath);
-	
+	u32 rsaSize = fs::file_size(rsaPath);
+
 	if (rsaSize != 0x88)
 	{
 		std::stringstream s;
@@ -809,11 +801,9 @@ void pack(const fs::path& outputPath)
 
 		throw std::length_error(s.view().data());
 	}
-	
-	openInputFile(fileStream, rsaPath);
+
 	romCheckBounds(rom, romOffset + rsaSize, config.padding);
-	fileStream.read(reinterpret_cast<char*>(&rom[romOffset]), rsaSize);
-	fileStream.close();
+	readInputFile(rsaPath, &rom[romOffset], rsaSize);
 
 	std::cout << "Done building ROM\n";
 	std::cout << "Fixing ROM header\n";
@@ -857,24 +847,29 @@ void pack(const fs::path& outputPath)
 	if (!headerFile.is_open())
 		throw std::runtime_error("failed to create file " + finalRomHeaderPath.string());
 
-	headerFile.write(reinterpret_cast<const char*>(rom.data()), romHeaderSize);
+	if (!headerFile.write(reinterpret_cast<const char*>(rom.data()), romHeaderSize))
+		throw std::runtime_error("failed to write file " + finalRomHeaderPath.string());
+
 	headerFile.close();
 
 	std::cout << "Writing " << config.romPath << '\n';
 
 	std::ofstream romFile(config.romPath, std::ios::binary | std::ios::out);
-	
+
 	if (!romFile.is_open())
 		throw std::runtime_error("failed to create file " + config.romPath.string());
 
-	romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+	if (!romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size()))
+		throw std::runtime_error("failed to write file " + config.romPath.string());
 
 	if (config.padding != Config::noPadding)
 	{
 		const auto size = (0x20000 << rom[20]) - rom.size();
 		rom.clear();
 		rom.resize(size, config.padding);
-		romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size());
+
+		if (!romFile.write(reinterpret_cast<const char*>(rom.data()), rom.size()))
+			throw std::runtime_error("failed to write file " + config.romPath.string());
 	}
 
 	romFile.close();

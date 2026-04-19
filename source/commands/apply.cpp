@@ -60,7 +60,9 @@ struct ApplyExtractor : Extractor
 			if (!outFile.is_open())
 				throw std::runtime_error("failed to create file " + tempFilePath.string());
 
-			outFile.write(static_cast<const char*>(data), size);
+			if (!outFile.write(static_cast<const char*>(data), size))
+				throw std::runtime_error("failed to write file " + tempFilePath.string());
+
 			return;
 		}
 
@@ -71,7 +73,10 @@ struct ApplyExtractor : Extractor
 			throw std::runtime_error("failed to open file " + lastBuiltPath.string());
 
 		std::vector<u8> lastBuiltFileData(fs::file_size(lastBuiltPath));
-		lastBuiltFile.read(reinterpret_cast<char*>(lastBuiltFileData.data()), lastBuiltFileData.size());
+
+		if (!lastBuiltFile.read(reinterpret_cast<char*>(lastBuiltFileData.data()), lastBuiltFileData.size()))
+			throw std::runtime_error("failed to read file " + lastBuiltPath.string());
+
 		lastBuiltFile.close();
 
 		if (lastBuiltFileData.size() != size || std::memcmp(data, lastBuiltFileData.data(), size) != 0)

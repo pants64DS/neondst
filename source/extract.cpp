@@ -45,7 +45,9 @@ void Extractor::extract()
 	std::vector<u32> romU32;
 	romU32.resize((ndsFileSize + 3) >> 2);
 
-	ndsFile.read(reinterpret_cast<char*>(romU32.data()), ndsFileSize);
+	if (!ndsFile.read(reinterpret_cast<char*>(romU32.data()), ndsFileSize))
+		throw std::runtime_error("failed to read file " + romPath.string());
+
 	ndsFile.close();
 
 	std::span<u8> romU8 = {reinterpret_cast<u8*>(romU32.data()), ndsFileSize};
