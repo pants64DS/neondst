@@ -5,7 +5,7 @@ ROM hack development. It allows a ROM hacking project to store modified or
 custom files in one directory while keeping the "clean" files from the base
 game in a separate directory. It supports not only building a ROM from the
 different source directories, but also applying changes from the ROM back into
-the source directories, e.g. after editing the ROM file with a external tool.
+the source directories, e.g. after editing the ROM file with an external tool.
 
 The core idea behind neondst was originally implemented in [Ndst](https://github.com/Gota7/Ndst),
 but it relied on an external build system in a way that made the build process
