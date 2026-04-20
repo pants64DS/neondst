@@ -58,6 +58,9 @@ void Commands::status(const fs::path& romPath)
 
 	for (const fs::path& rootPath : {modifiedBase, modifiedToBeCompressed, modifiedFinal})
 	{
+		if (!fs::is_directory(rootPath))
+			continue;
+
 		for (const fs::directory_entry& dirEntry : fs::recursive_directory_iterator(rootPath))
 		{
 			const fs::path& p = dirEntry.path();

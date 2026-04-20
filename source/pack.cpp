@@ -465,6 +465,7 @@ void pack(const fs::path& outputPath)
 	const fs::path rsaPath       = findInputFile("rsasig.bin");
 
 	const fs::path modifiedFinalPath = fs::path("modified") / "final";
+	fs::create_directories(modifiedFinalPath);
 
 	std::cout << "Reading ROM header\n";
 

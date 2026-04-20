@@ -47,6 +47,6 @@ void Commands::init(const fs::path& cleanRomPath)
 
 	const fs::path modified = "modified";
 
-	fs::create_directories(modified / "to-be-compressed");
+	fs::create_directories(modified / "base");
 	fs::create_directory(modified / "final");
 }

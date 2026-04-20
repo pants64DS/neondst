@@ -161,6 +161,9 @@ void Commands::apply(const fs::path& romPath)
 
 	const fs::path modifiedBasePath = fs::path("modified") / "base";
 	fs::remove_all(modifiedBasePath);
-	fs::rename(tempPath, modifiedBasePath);
+
+	if (fs::is_directory(tempPath))
+		fs::rename(tempPath, modifiedBasePath);
+
 	fs::remove_all(fs::path("modified") / "to-be-comressed");
 }
