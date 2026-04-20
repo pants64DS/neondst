@@ -47,14 +47,14 @@ or `modified/final` are skipped. If `modified/to-be-compressed` exists, it will 
 
 Enumerates files that differ between the ROM and the source directories, including ones
 that only exist in one or the other. This effectively allows the user to check if
-anything will get overwritten when running `neondst build` or `neondst apply`.
+anything will get overwritten or deleted when running `neondst build` or `neondst apply`.
 
 ### `neondst decompress <files...>`
 
 Decompresses files from `clean/raw` to `clean/decompressed`. File paths should be relative to
 `clean/raw`. At the moment, this is only supported for overlays and the ARM9 binary (arm9.bin).
 
-## Configuration File
+## Configuration
 
 Certain options can be specified in a `.neondst` file in the directory containing the
 neondst project:
