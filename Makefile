@@ -1,10 +1,11 @@
+VERSION  := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo unknown)
 SOURCES  := source source/commands
 BUILD    := build
 OUTPUT   := neondst
 INCLUDES := $(SOURCES)
 INCLUDE  := $(foreach dir,$(INCLUDES),-I$(dir))
 CXX      := g++
-CXXFLAGS := $(INCLUDE) -std=c++23 -Wall -Wextra -O3
+CXXFLAGS := $(INCLUDE) -DNEONDST_VERSION=\"$(VERSION)\" -std=c++23 -Wall -Wextra -O3
 LDFLAGS  := -static -static-libgcc -static-libstdc++
 BINDIR   ?= /usr/local/bin
 

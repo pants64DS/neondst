@@ -24,9 +24,8 @@ void Commands::help(std::string_view commandName)
 	{
 		if (command.name == commandName)
 		{
-			std::cout << (found ? "   or: " : "usage: ");
 			found = true;
-
+			std::cout << "usage: ";
 			command.printUsage();
 		}
 	}

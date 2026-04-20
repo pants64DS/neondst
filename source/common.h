@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <filesystem>
 
-#define WARNING "\x1B[1;95mwarning: \033[0m"
-#define ERROR   "\x1B[1;91merror: \033[0m"
+#define WARNING "\x1b[1;95mwarning: \x1b[0m"
+#define ERROR   "\x1b[1;91merror: \x1b[0m"
 
 using s8 = std::int8_t;
 using s16 = std::int16_t;

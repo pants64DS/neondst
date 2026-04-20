@@ -75,7 +75,7 @@ void Commands::status(const fs::path& romPath)
 		std::cout << "Files in " << fs::path("modified") << " not in " << config.romPath << ":\n";
 
 		for (const fs::path& p : sourceOnlyPaths)
-			std::cout << "\t\x1B[0;32m" << p.string() << "\033[0m\n";
+			std::cout << "\t\x1b[0;32m" << p.string() << "\x1b[0m\n";
 
 		std::cout << '\n';
 	}
@@ -86,7 +86,7 @@ void Commands::status(const fs::path& romPath)
 		std::cout << "Files in " << config.romPath << " not in the source directories:\n";
 
 		for (const auto& p : status.romOnlyPaths)
-			std::cout << "\t\x1B[0;31m" << p.string() << "\033[0m\n";
+			std::cout << "\t\x1b[0;31m" << p.string() << "\x1b[0m\n";
 
 		std::cout << '\n';
 	}
@@ -97,7 +97,7 @@ void Commands::status(const fs::path& romPath)
 		std::cout << "Files that differ between " << config.romPath << " and the source directories:\n";
 
 		for (const auto& p : status.diffPaths)
-			std::cout << "\t\x1B[0;33m" << p.string() << "\033[0m\n";
+			std::cout << "\t\x1b[0;33m" << p.string() << "\x1b[0m\n";
 
 		std::cout << '\n';
 	}
