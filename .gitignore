@@ -3,7 +3,6 @@ clean
 modified
 ignore
 neondst
-version.txt
 *.exe
 *.nds
 *.sav
