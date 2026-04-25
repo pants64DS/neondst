@@ -27,10 +27,10 @@ void Commands::version()
 		if (column < 33 || (column == 33 && row != 8))
 		{
 			if (
-				(row >= 7               ) ||
-				(row == 6 && column > 8 ) ||
-				(row == 5 && column > 14) ||
-				(row == 4 && column > 30)
+				(row >= 8               ) ||
+				(row == 7 && column > 8 ) ||
+				(row == 6 && column > 14) ||
+				(row == 5 && column > 30)
 			)
 				std::cout << "\x1b[1;94m";
 			else

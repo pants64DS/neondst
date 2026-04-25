@@ -698,6 +698,20 @@ void pack(const fs::path& outputPath)
 	romOffset += fntSize;
 	romOffset = alignAddress(romOffset, 4);
 
+	const fs::path finalFntPath = modifiedFinalPath / "fnt.bin";
+	std::cout << "Writing " << finalFntPath << '\n';
+
+	// write final fnt file here
+	std::ofstream fntFile(finalFntPath, std::ios::binary | std::ios::out);
+
+	if (!fntFile.is_open())
+		throw std::runtime_error("failed to create file " + finalFntPath.string());
+
+	if (!fntFile.write(reinterpret_cast<const char*>(rom.data() + fntOffset), fntSize))
+		throw std::runtime_error("failed to write file " + finalFntPath.string());
+
+	fntFile.close();
+
 	std::cout << "Allocating FAT\n";
 
 	u32 fatSize = freeFileID * 8;
