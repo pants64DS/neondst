@@ -44,34 +44,44 @@ struct Command
 	void(&funcWrapper)(std::uintptr_t funcAddr, int argc, char** argv);
 	const char* name;
 	int minArgs, maxArgs;
+	std::size_t usageWidth;
 	const char* usage;
+	const char* desc;
 
-	template<class... Args> Command(
+	template<class... Args, std::size_t n, std::size_t u>
+	constexpr Command(
 		void (&func)(Args...),
-		const char* name,
-		const char* usage,
-		uint32_t numRequiredArgs = 0
+		const char (&name)[n],
+		const char (&usage)[u],
+		uint32_t numRequiredArgs,
+		const char* desc
 	):
 		funcAddr(reinterpret_cast<std::uintptr_t>(&func)),
 		funcWrapper(commandFuncWrapper<Args...>),
 		name(name),
 		minArgs(numRequiredArgs),
 		maxArgs(sizeof...(Args)),
-		usage(usage)
+		usageWidth(7 + n + u),
+		usage(usage),
+		desc(desc)
 	{}
 
-	template<class Arg> Command(
+	template<class Arg, std::size_t n, std::size_t u>
+	constexpr Command(
 		void (&func)(std::span<Arg>),
-		const char* name,
-		const char* usage,
-		uint32_t numRequiredArgs = 0
+		const char (&name)[n],
+		const char (&usage)[u],
+		uint32_t numRequiredArgs,
+		const char* desc
 	):
 		funcAddr(reinterpret_cast<std::uintptr_t>(&func)),
 		funcWrapper(commandFuncWrapper2<Arg>),
 		name(name),
 		minArgs(numRequiredArgs),
 		maxArgs(std::numeric_limits<int>::max()),
-		usage(usage)
+		usageWidth(7 + n + u),
+		usage(usage),
+		desc(desc)
 	{}
 
 	int run(int argc, char** argv) const;
@@ -91,14 +101,6 @@ namespace Commands
 	void version();
 }
 
-inline const Command commands[] = {
-	{Commands::init,       "init",       "<clean ROM>", 1},
-	{Commands::build,      "build",      "[<output ROM>]"},
-	{Commands::apply,      "apply",      "[<input ROM>]"},
-	{Commands::status,     "status",     "[<ROM>]"},
-	{Commands::decompress, "decompress", "<files...>", 1},
-	{Commands::help,       "help",       "[<command>]"},
-	{Commands::version,    "version",    ""}
-};
+extern const Command commands[7];
 
 int runCommand(std::string_view commandName, int argc, char** argv);
