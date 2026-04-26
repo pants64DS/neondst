@@ -63,7 +63,7 @@ constexpr const Command commands[] =
 {
 	{
 		Commands::init, "init", "<clean ROM>", 1,
-		"Initializes    a new neondst  project in the current directory. "
+		"Initializes a new neondst project in the current directory. "
 		"Files from the  clean  ROM are   extracted to  clean/raw and "
 		"other   relevant directories  are created."
 	},
@@ -87,7 +87,8 @@ constexpr const Command commands[] =
 		"Enumerates files that differ between the ROM and the source "
 		"directories, including ones that only exist in one or the other. "
 		"This effectively allows the user to check if anything will get "
-		"overwritten or deleted when running 'neondst build' or 'neondst apply'."
+		"overwritten or deleted when running 'neondst\xa0"
+		"build' or 'neondst\xa0" "apply'."
 	},
 	{
 		Commands::decompress, "decompress", "<files...>", 1,
